@@ -1,0 +1,78 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate 2>&1 | tee xcodegen.log
+
+      - name: Build (unsigned)
+        run: |
+          xcodebuild \
+            -project GFNRumble.xcodeproj \
+            -target GFNRumble \
+            -configuration Release \
+            -sdk iphoneos \
+            SYMROOT="$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee build.log
+
+      - name: Package IPA
+        run: |
+          APP="build/Release-iphoneos/GFNRumble.app"
+          test -d "$APP"
+          test -f "$APP/rumble-bridge.js"
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qr GFNRumble.ipa Payload
+
+      # 실패하면 오류 내용을 실행 결과 첫 화면(Summary)에 적어 둡니다.
+      - name: Summarize failure
+        if: failure()
+        run: |
+          {
+            echo "## 빌드 실패 요약"
+            for f in xcodegen.log build.log; do
+              if [ -f "$f" ]; then
+                echo "### $f"
+                echo '```'
+                grep -E "error|Error|FAILED" "$f" | sort -u | head -n 60 || true
+                echo "--- 마지막 30줄 ---"
+                tail -n 30 "$f"
+                echo '```'
+              fi
+            done
+            echo "### 빌드 폴더"
+            echo '```'
+            ls -R build 2>/dev/null | head -n 60 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GFNRumble-ipa
+          path: GFNRumble.ipa
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: GFN 진동 빌드 ${{ github.run_number }}
+          files: GFNRumble.ipa
