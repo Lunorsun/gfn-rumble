@@ -1,4 +1,4 @@
-# GFN 진동 — 아이패드용 지포스 나우 진동 앱
+# GFN Rumble (GFN 진동) — 아이패드용 지포스 나우 진동 앱
 
 아이패드에서 지포스 나우를 열고, 게임이 보내는 진동 신호를 컨트롤러로 전달해 주는 앱입니다.
 App Store를 거치지 않고, 본인 Apple ID로 직접 설치합니다.
@@ -61,11 +61,14 @@ SideStore는 아이패드에서 앱을 직접 설치하고 갱신해 주는 도�
 
 **PC에서**
 
-3. [iTunes](https://www.apple.com/itunes/download/win64) 를 설치합니다. (Apple 사이트의 버전을 추천)
+3. Microsoft Store에서 **Apple 기기**(Apple Devices) 앱을 설치하고 **한 번 열어서 사용권 계약에 동의**합니다.
+   - 동의하기 전에는 아이패드 연결 서비스가 켜지지 않아, iloader에 `Failed to connect to usbmuxd` 오류가 납니다.
+   - Apple 기기 앱 대신 [iTunes](https://www.apple.com/itunes/download/win64)를 써도 됩니다.
 4. [iloader](https://github.com/nab138/iloader/releases/latest/download/iloader-windows-x64.msi) 를 내려받아 설치합니다.
 5. 아이패드를 USB로 연결하고, 아이패드에 "이 컴퓨터를 신뢰하겠습니까?"가 뜨면 **신뢰** 를 누릅니다.
 6. iloader를 열고 Apple ID로 로그인합니다.
-7. 아이패드를 선택하고 **Install SideStore (Stable)** 를 누릅니다.
+7. '기기' 칸의 아이패드에 **선택됨** 표시가 있는지 확인하고, **SideStore (안정)** 을 누릅니다.
+   - 선택됨 표시가 없으면 설치 버튼이 반응하지 않습니다. **새로고침** 을 누르거나 케이블을 다시 연결하세요.
 
 **다시 아이패드에서**
 
@@ -78,12 +81,16 @@ SideStore는 아이패드에서 앱을 직접 설치하고 갱신해 주는 도�
 
 ---
 
-## 3단계: GFN 진동 앱 설치 — 아이패드에서
+## 3단계: GFN Rumble 앱 설치 — 아이패드에서
 
-1. 아이패드 Safari로 본인 GitHub 저장소의 **Releases** 에 들어가 `GFNRumble.ipa` 를 내려받습니다.
+이 앱은 SideStore의 앱 목록(Browse)에는 없습니다. 파일을 받아서 직접 고릅니다.
+
+1. 아이패드 **Safari** 로 아래 주소를 열고, "다운로드하겠습니까?"에서 **다운로드** 를 누릅니다.
+   `https://github.com/Lunorsun/gfn-rumble/releases/latest/download/GFNRumble.ipa`
+   - 받아지면 Safari 오른쪽 위에 ↓ 아이콘이 생깁니다.
 2. LocalDevVPN이 **연결된 상태**인지 확인합니다.
-3. SideStore → **My Apps** → 왼쪽 위 **+** → 방금 받은 `GFNRumble.ipa` 선택.
-4. 홈 화면에 **GFN 진동** 앱이 생깁니다.
+3. SideStore → **My Apps** → 왼쪽 위 **+** → **최근 항목** (또는 iCloud Drive → 다운로드) → `GFNRumble.ipa` 선택.
+4. 홈 화면에 **GFN Rumble** 앱이 생깁니다.
 
 ---
 
@@ -108,7 +115,7 @@ SideStore는 아이패드에서 앱을 직접 설치하고 갱신해 주는 도�
 ## 5단계: 사용과 진동 테스트
 
 1. 컨트롤러를 아이패드에 블루투스로 연결합니다. (설정 → Bluetooth)
-2. **GFN 진동** 앱을 열고 지포스 나우에 로그인합니다.
+2. **GFN Rumble** 앱을 열고 지포스 나우에 로그인합니다.
 3. 화면 **왼쪽 아래의 흐릿한 톱니바퀴** 를 누르면 메뉴가 나옵니다.
 
 **테스트는 이 순서로 해 주세요.**

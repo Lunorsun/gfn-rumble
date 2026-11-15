@@ -15,7 +15,8 @@ targets:
     info:
       path: GFNRumble/Info.plist
       properties:
-        CFBundleDisplayName: GFN 진동
+        # 영문만 씁니다. SideStore가 이 이름으로 Apple에 앱을 등록하는데, 한글은 거부됩니다.
+        CFBundleDisplayName: GFN Rumble
         UILaunchScreen:
           UIImageRespectsSafeAreaInsets: false
         UIRequiresFullScreen: true
