@@ -8,7 +8,15 @@
   try {
     if (!navigator.getGamepads) return;
     var original = navigator.getGamepads.bind(navigator);
-    var cfg = { deadzone: 0, curve: 1, invertY: false, swapAB: false };
+    var cfg = { deadzone: 0, curve: 1, invertY: false, swapAB: false, gyro: false };
+    var gyroX = 0, gyroY = 0;
+    // 앱이 자이로 값을 넣어 줍니다 (오른쪽 스틱에 더함)
+    window.__gfnGyro = {
+      set: function (x, y) {
+        gyroX = isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
+        gyroY = isFinite(y) ? Math.max(-1, Math.min(1, y)) : 0;
+      }
+    };
     var active = false;
     var wrappers = {};
 
@@ -24,7 +32,9 @@
       cfg.curve = num(c.curve, 1, 0.5, 2);
       cfg.invertY = !!c.invertY;
       cfg.swapAB = !!c.swapAB;
-      active = cfg.deadzone > 0 || Math.abs(cfg.curve - 1) > 0.001 || cfg.invertY || cfg.swapAB;
+      cfg.gyro = !!c.gyro;
+      if (!cfg.gyro) { gyroX = 0; gyroY = 0; }
+      active = cfg.deadzone > 0 || Math.abs(cfg.curve - 1) > 0.001 || cfg.invertY || cfg.swapAB || cfg.gyro;
     }
 
     // 스틱 하나(x, y): 원형 데드존 + 반응 곡선
@@ -59,6 +69,12 @@
       if (a.length >= 4) {
         stick(a[2], a[3], w.axes, 2);
         if (cfg.invertY) w.axes[3] = -w.axes[3];
+        if (cfg.gyro && pad.index === 0) {
+          w.axes[2] = Math.max(-1, Math.min(1, w.axes[2] + gyroX));
+          w.axes[3] = Math.max(-1, Math.min(1, w.axes[3] + gyroY));
+          // 스틱을 안 움직여도 자이로가 바뀌면 새 입력으로 보이게
+          if (gyroX || gyroY) w.timestamp = Math.max(pad.timestamp, performance.now());
+        }
       }
 
       var b = pad.buttons;

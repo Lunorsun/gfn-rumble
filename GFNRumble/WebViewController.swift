@@ -20,6 +20,7 @@ final class WebViewController: UIViewController {
     // 실험 기능
     private let mouseModeOn = AppSettings.shared.mouseModeEnabled   // 앱을 다시 켜야 바뀜
     private var mouseInput: MouseInput?
+    private lazy var gyroAim = GyroAim { [weak self] in self?.webView }
     private let tvLabel = UILabel()
 
     // MARK: - 화면 설정
@@ -41,6 +42,7 @@ final class WebViewController: UIViewController {
         WarningCenter.shared.start()
         TriggerEffects.shared.start()
         ExternalDisplayCoordinator.shared.host = self
+        gyroAim.start()
 
         if mouseModeOn {
             let input = MouseInput(viewController: self) { [weak self] in self?.webView }
@@ -197,7 +199,8 @@ final class WebViewController: UIViewController {
 
     @objc private func showMenu() {
         let sheet = UIAlertController(title: "GFN Rumble",
-                                      message: "서명: " + ExpiryMonitor.shared.statusText(),
+                                      message: "서명: " + ExpiryMonitor.shared.statusText()
+                                        + "\n받은 화질: " + (QualityAlerts.shared.lastSummary ?? "아직 없음 (게임 중에 확인)"),
                                       preferredStyle: .actionSheet)
 
         sheet.addAction(UIAlertAction(title: "설정", style: .default) { [weak self] _ in

@@ -177,6 +177,59 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: key("request2K")); notify() }
     }
 
+    /// 강제로 요청할 해상도 (request2K가 켜졌을 때)
+    static let resolutionPresets: [(title: String, width: Int, height: Int)] = [
+        ("1920x1080 (16:9)", 1920, 1080),
+        ("2048x1536 (4:3, 꽉 참)", 2048, 1536),
+        ("2160x1620 (아이패드 원래 해상도)", 2160, 1620),
+        ("2560x1440 (2K)", 2560, 1440)
+    ]
+
+    var resolutionPreset: Int {
+        get { min(max(defaults.object(forKey: key("resolutionPreset")) == nil ? 3 : defaults.integer(forKey: key("resolutionPreset")), 0), 3) }
+        set { defaults.set(min(max(newValue, 0), 3), forKey: key("resolutionPreset")); notify() }
+    }
+
+    // MARK: - 자이로 조준 (듀얼센스)
+
+    var gyroEnabled: Bool {
+        get { bool("gyroEnabled", default: false) }
+        set { defaults.set(newValue, forKey: key("gyroEnabled")); notify() }
+    }
+
+    /// 0 = 항상, 1 = L2 누를 때만, 2 = 터치패드 누를 때만
+    var gyroActivation: Int {
+        get { min(max(defaults.integer(forKey: key("gyroActivation")), 0), 2) }
+        set { defaults.set(min(max(newValue, 0), 2), forKey: key("gyroActivation")); notify() }
+    }
+
+    var gyroSensitivityX: Double {
+        get { double("gyroSensitivityX", default: 1.0, range: 0.1...4.0) }
+        set { set(newValue, "gyroSensitivityX", range: 0.1...4.0) }
+    }
+
+    var gyroSensitivityY: Double {
+        get { double("gyroSensitivityY", default: 1.0, range: 0.1...4.0) }
+        set { set(newValue, "gyroSensitivityY", range: 0.1...4.0) }
+    }
+
+    var gyroInvertY: Bool {
+        get { bool("gyroInvertY", default: false) }
+        set { defaults.set(newValue, forKey: key("gyroInvertY")); notify() }
+    }
+
+    /// 가로 조준에 쓸 축: false = 좌우로 돌리기, true = 좌우로 기울이기
+    var gyroUseRoll: Bool {
+        get { bool("gyroUseRoll", default: false) }
+        set { defaults.set(newValue, forKey: key("gyroUseRoll")); notify() }
+    }
+
+    /// 떨림 줄이기 0.0 ~ 0.9
+    var gyroSmoothing: Double {
+        get { double("gyroSmoothing", default: 0.3, range: 0.0...0.9) }
+        set { set(newValue, "gyroSmoothing", range: 0.0...0.9) }
+    }
+
     // MARK: - 웹페이지로 넘기는 설정
 
     /// 웹페이지(JS)에 넘길 설정. 개인정보는 들어가지 않습니다.
@@ -191,7 +244,10 @@ final class AppSettings {
             "sessionAlerts": sessionAlertsEnabled,
             "mouseMode": mouseModeEnabled,
             "mouseSensitivity": mouseSensitivity,
-            "request2K": request2K
+            "request2K": request2K,
+            "resWidth": Self.resolutionPresets[resolutionPreset].width,
+            "resHeight": Self.resolutionPresets[resolutionPreset].height,
+            "gyro": gyroEnabled
         ]
     }
 

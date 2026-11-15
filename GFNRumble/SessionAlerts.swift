@@ -41,6 +41,9 @@ final class QualityAlerts: NSObject, WKScriptMessageHandler {
     private var lossCount = 0
     private var resolutionWarned = false
 
+    /// 메뉴에 보여 줄 마지막으로 받은 화질 (없으면 nil)
+    private(set) var lastSummary: String?
+
     /// 새 게임(스트림)이 시작되면 다시 확인합니다.
     func reset() {
         lowFpsCount = 0
@@ -52,36 +55,51 @@ final class QualityAlerts: NSObject, WKScriptMessageHandler {
                                didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any],
               let type = body["type"] as? String else { return }
+        let settings = AppSettings.shared
+        let warnings = WarningCenter.shared
+
         if type == "streamStarted" { reset(); return }
-        guard type == "stats", AppSettings.shared.request2K else { return }
+
+        if type == "sessionFailed" {
+            // 서버가 거부함 → 다음 시작부터 원래 해상도로
+            guard settings.request2K else { return }
+            settings.request2K = false
+            warnings.show("서버가 강제 해상도를 거부했어요. 해상도 강제 요청을 껐어요. 다시 게임을 시작해 주세요.", duration: 10)
+            return
+        }
+        guard type == "stats" else { return }
 
         func number(_ key: String) -> Double { (body[key] as? NSNumber)?.doubleValue ?? 0 }
         let width = Int(number("width")), height = Int(number("height"))
         let fps = number("fps"), loss = number("loss")
-        let warnings = WarningCenter.shared
+        if width > 0 && height > 0 {
+            lastSummary = "\(width)x\(height) · \(Int(fps.rounded()))fps · 손실 \(String(format: "%.1f", loss))%"
+        }
+        guard settings.request2K else { return }
 
-        // 2K가 적용되지 않음 (스트림이 안정된 뒤 한 번만)
-        if height > 0 && height < 1300 && !resolutionWarned && number("seconds") >= 20 {
+        // 요청한 해상도가 적용되지 않음 (스트림이 안정된 뒤 한 번만)
+        let target = AppSettings.resolutionPresets[settings.resolutionPreset]
+        if height > 0 && height < target.height - 50 && !resolutionWarned && number("seconds") >= 20 {
             resolutionWarned = true
-            warnings.show("2K가 적용되지 않았어요 (지금 \(width)x\(height)). 멤버십 등급이 안 되거나 서버가 낮춘 거예요.", duration: 8)
+            warnings.show("\(target.width)x\(target.height)가 적용되지 않았어요 (지금 \(width)x\(height)). 멤버십 등급이 안 되거나 서버가 낮춘 거예요.", duration: 8)
         }
 
         // 끊김: 15초 넘게 45fps 미만
         lowFpsCount = (fps > 0 && fps < 45) ? lowFpsCount + 1 : 0
         if lowFpsCount == 3 {
-            warnings.show("화면이 끊기고 있어요 (초당 \(Int(fps))프레임). 2K를 끄거나 지포스 나우 화질을 낮춰 보세요.", duration: 8)
+            warnings.show("화면이 끊기고 있어요 (초당 \(Int(fps))프레임). 해상도를 낮춰 보세요.", duration: 8)
         }
 
         // 연결 불안정: 15초 넘게 손실 3% 이상
         lossCount = loss >= 3 ? lossCount + 1 : 0
         if lossCount == 3 {
-            warnings.show("연결이 불안정해요 (손실 \(Int(loss))%). 2K는 데이터를 많이 써요.", duration: 8)
+            warnings.show("연결이 불안정해요 (손실 \(Int(loss))%). 높은 해상도는 데이터를 많이 써요.", duration: 8)
         }
 
         // 발열
         let thermal = ProcessInfo.processInfo.thermalState
         if thermal == .serious || thermal == .critical {
-            warnings.warn("thermal2K", "2K 때문에 아이패드가 뜨거워요. 2K를 꺼 보세요.")
+            warnings.warn("thermal2K", "높은 해상도 때문에 아이패드가 뜨거워요. 해상도를 낮춰 보세요.")
         }
     }
 }

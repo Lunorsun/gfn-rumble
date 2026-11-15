@@ -127,10 +127,30 @@ final class SettingsViewController: UITableViewController {
                         .slider(title: "마우스 감도", range: 0.2...3.0, format: Self.times,
                                 get: { s.mouseSensitivity }, set: { s.mouseSensitivity = $0 }),
                         .info("마우스·키보드는 앱을 완전히 껐다 켜야 적용돼요. 블루투스 마우스가 필요해요."),
-                        .toggle(title: "2K 화질 요청 (위험)", get: { s.request2K },
+                        .toggle(title: "해상도 강제 요청 (위험)", get: { s.request2K },
                                 set: { s.request2K = $0 },
-                                confirmOn: (title: "2K 화질 요청을 켤까요?",
-                                            message: "• 지포스 나우에 보내는 요청을 고치는 기능이라 NVIDIA 약관 위반으로 계정이 정지될 수 있어요.\n• Ultimate 등급이 아니면 서버가 알아서 낮춰요.\n• 아이패드 9 화면에서는 1600x1200과 차이가 크지 않고, 발열·데이터가 늘어요.\n• 2K가 안 되거나 끊김·발열이 생기면 화면에 알려 드려요.\n• 다음 게임을 시작할 때부터 적용돼요."))
+                                confirmOn: (title: "해상도 강제 요청을 켤까요?",
+                                            message: "• 지포스 나우에 보내는 요청을 고치는 기능이라 NVIDIA 약관 위반으로 계정이 정지될 수 있어요.\n• 멤버십 등급보다 높으면 서버가 알아서 낮춰요.\n• 발열·데이터 사용이 늘어요.\n• 서버가 거부하면 자동으로 꺼지고, 해상도가 안 맞거나 끊김·발열이 생기면 화면에 알려 드려요.\n• 다음 게임을 시작할 때부터 적용돼요."))
+                        .segmented(title: "목표 해상도", items: ["1080p", "2048×1536", "2160×1620", "2K"],
+                                   get: { s.resolutionPreset }, set: { s.resolutionPreset = $0 }),
+                        .info("2048×1536과 2160×1620은 4:3이라 아이패드 화면에 꽉 차요. 실제로 받은 화질은 톱니바퀴 메뉴에서 볼 수 있어요.")
+                    ]),
+
+            Section(title: "자이로 조준 (듀얼센스)",
+                    footer: "듀얼센스를 기울이거나 돌리면 오른쪽 스틱처럼 움직여요. Xbox·8BitDo는 자이로가 없어요. 방향이 반대면 반전·축을 바꿔 보세요.",
+                    rows: [
+                        .toggle(title: "자이로 조준", get: { s.gyroEnabled }, set: { s.gyroEnabled = $0 }, confirmOn: nil),
+                        .segmented(title: "켜지는 때", items: ["항상", "L2 누를 때", "터치패드 누를 때"],
+                                   get: { s.gyroActivation }, set: { s.gyroActivation = $0 }),
+                        .slider(title: "가로 감도", range: 0.1...4.0, format: Self.times,
+                                get: { s.gyroSensitivityX }, set: { s.gyroSensitivityX = $0 }),
+                        .slider(title: "세로 감도", range: 0.1...4.0, format: Self.times,
+                                get: { s.gyroSensitivityY }, set: { s.gyroSensitivityY = $0 }),
+                        .toggle(title: "세로 반전", get: { s.gyroInvertY }, set: { s.gyroInvertY = $0 }, confirmOn: nil),
+                        .toggle(title: "가로를 기울이기로 (기본: 돌리기)", get: { s.gyroUseRoll },
+                                set: { s.gyroUseRoll = $0 }, confirmOn: nil),
+                        .slider(title: "떨림 줄이기", range: 0...0.9, format: Self.percent,
+                                get: { s.gyroSmoothing }, set: { s.gyroSmoothing = $0 })
                     ]),
 
             Section(title: "보안", footer: nil, rows: [

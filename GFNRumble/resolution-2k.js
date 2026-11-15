@@ -1,5 +1,5 @@
-// GFN Rumble 실험 기능: 2K(2560x1440) 화질 요청 + 실제 화질 확인
-// 설정에서 '2K 요청'을 켰을 때만 동작합니다(기본 꺼짐).
+// GFN Rumble 실험 기능: 해상도 강제 요청(1080p~2K) + 실제 화질 확인
+// 요청 고치기는 설정에서 '해상도 강제 요청'을 켰을 때만 동작합니다(기본 꺼짐).
 // - 지포스 나우가 게임을 시작할 때 보내는 요청(/v2/session)의 '원하는 해상도' 숫자만 바꿉니다.
 //   요청은 원래 가던 지포스 나우 서버로만 갑니다. 새 주소로 보내는 것은 없습니다.
 // - 받은 영상의 해상도·fps·손실률 숫자만 앱(네이티브)에 알려 줍니다.
@@ -10,7 +10,16 @@
   window.__gfnRes2K = true;
 
   try {
-    var WIDTH = 2560, HEIGHT = 1440, FPS = 60;
+    function post(msg) {
+      try { window.webkit.messageHandlers.quality.postMessage(msg); } catch (e) {}
+    }
+    var FPS = 60;
+    function target() {
+      var c = window.__gfnConfig || {};
+      var w = Number(c.resWidth), h = Number(c.resHeight);
+      if (!(w >= 640 && w <= 3840 && h >= 480 && h <= 2160)) { w = 2560; h = 1440; }
+      return { w: Math.round(w), h: Math.round(h) };
+    }
 
     function enabled() { return !!(window.__gfnConfig && window.__gfnConfig.request2K); }
 
@@ -26,6 +35,7 @@
     function patchBody(text) {
       try {
         var data = JSON.parse(text);
+        var size = target(), WIDTH = size.w, HEIGHT = size.h;
         var req = data && data.sessionRequestData;
         if (!req) return text;
         var monitors = req.clientRequestMonitorSettings;
@@ -48,26 +58,41 @@
       } catch (e) { return text; }
     }
 
+    // 서버가 거부하면 앱에 알려서 다음부터 원래 해상도로 돌립니다.
+    function checkResponse(response) {
+      try {
+        if (response && !response.ok) post({ type: 'sessionFailed', status: response.status });
+      } catch (e) {}
+      return response;
+    }
+
     // fetch: 지포스 나우가 보내는 요청을 가로채 숫자만 바꿉니다.
     var originalFetch = window.fetch;
     if (typeof originalFetch === 'function') {
       window.fetch = function (input, init) {
+        var self = this;
         try {
           if (enabled()) {
             var url = (input && input.url) || input;
             var method = (init && init.method) || (input && input.method);
-            if (isSessionRequest(url, method) && init && typeof init.body === 'string') {
-              var copy = {};
-              for (var k in init) copy[k] = init[k];
-              copy.body = patchBody(init.body);
-              return originalFetch.call(this, input, copy);
+            if (isSessionRequest(url, method)) {
+              if (init && typeof init.body === 'string') {
+                var copy = {};
+                for (var k in init) copy[k] = init[k];
+                copy.body = patchBody(init.body);
+                return originalFetch.call(self, input, copy).then(checkResponse);
+              }
+              if (!init && typeof Request === 'function' && input instanceof Request) {
+                return input.clone().text().then(function (text) {
+                  return originalFetch.call(self, new Request(input, { body: patchBody(text) }));
+                }).then(checkResponse);
+              }
             }
           }
         } catch (e) {}
-        return originalFetch.apply(this, arguments);
+        return originalFetch.apply(self, arguments);
       };
     }
-
     // XMLHttpRequest도 같은 방식으로
     var XHR = window.XMLHttpRequest;
     if (XHR && XHR.prototype) {
@@ -79,6 +104,10 @@
       XHR.prototype.send = function (body) {
         try {
           if (this.__gfn2k && enabled() && typeof body === 'string') {
+            var xhr = this;
+            xhr.addEventListener('loadend', function () {
+              if (xhr.status >= 400) post({ type: 'sessionFailed', status: xhr.status });
+            });
             return send.call(this, patchBody(body));
           }
         } catch (e) {}
@@ -87,9 +116,6 @@
     }
 
     // 받은 영상 화질 확인 (5초마다 숫자만 앱으로)
-    function post(msg) {
-      try { window.webkit.messageHandlers.quality.postMessage(msg); } catch (e) {}
-    }
     var PC = window.RTCPeerConnection;
     if (typeof PC === 'function') {
       var Wrapped = function () {
@@ -107,7 +133,6 @@
       var started = 0, lastFrames = 0, lastLost = 0, lastRecv = 0, timer = null;
       function tick() {
         if (pc.connectionState === 'closed') { clearInterval(timer); return; }
-        if (!enabled()) return;
         pc.getStats().then(function (report) {
           report.forEach(function (s) {
             if (s.type !== 'inbound-rtp' || s.kind !== 'video') return;
