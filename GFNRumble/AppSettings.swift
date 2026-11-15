@@ -261,6 +261,61 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: key("audioHapticsStereo")); notify() }
     }
 
+    /// 음역별 세기 0 ~ 2: 초저음(묵직), 저음(충격), 중고음(총소리·금속)
+    var audioSubGain: Double {
+        get { double("audioSubGain", default: 1.0, range: 0...2) }
+        set { set(newValue, "audioSubGain", range: 0...2) }
+    }
+    var audioBassGain: Double {
+        get { double("audioBassGain", default: 0.8, range: 0...2) }
+        set { set(newValue, "audioBassGain", range: 0...2) }
+    }
+    var audioMidGain: Double {
+        get { double("audioMidGain", default: 0.6, range: 0...2) }
+        set { set(newValue, "audioMidGain", range: 0...2) }
+    }
+
+    /// 날카로움 차이 0 ~ 1 (0 = 모두 같은 느낌, 1 = 폭발은 묵직·총소리는 또렷)
+    var audioSharpness: Double {
+        get { double("audioSharpness", default: 0.7, range: 0...1) }
+        set { set(newValue, "audioSharpness", range: 0...1) }
+    }
+
+    /// 타격감 0 ~ 2 ('탁' 세기)
+    var audioImpact: Double {
+        get { double("audioImpact", default: 1.0, range: 0...2) }
+        set { set(newValue, "audioImpact", range: 0...2) }
+    }
+
+    /// 공간 폭 0 ~ 2 (0 = 양쪽 똑같이, 1 = 소리 그대로, 2 = 좌우 차이 크게)
+    var audioWidth: Double {
+        get { double("audioWidth", default: 1.0, range: 0...2) }
+        set { set(newValue, "audioWidth", range: 0...2) }
+    }
+
+    /// 튀는 속도 0 ~ 1 (1 = 즉시), 사라지는 속도 0 ~ 1 (1 = 즉시)
+    var audioAttack: Double {
+        get { double("audioAttack", default: 0.85, range: 0...1) }
+        set { set(newValue, "audioAttack", range: 0...1) }
+    }
+    var audioRelease: Double {
+        get { double("audioRelease", default: 0.35, range: 0...1) }
+        set { set(newValue, "audioRelease", range: 0...1) }
+    }
+
+    /// 프리셋: 0 = 액션, 1 = 레이싱, 2 = FPS
+    func applyAudioPreset(_ preset: Int) {
+        let values: (sub: Double, bass: Double, mid: Double, sharp: Double, impact: Double, width: Double, attack: Double, release: Double)
+        switch preset {
+        case 1:  values = (1.4, 0.9, 0.3, 0.4, 0.4, 0.8, 0.6, 0.2)   // 레이싱: 엔진 몸통 위주, 부드럽게
+        case 2:  values = (0.6, 0.8, 1.2, 1.0, 1.6, 1.4, 1.0, 0.6)   // FPS: 총소리 또렷, 방향감 크게
+        default: values = (1.1, 1.0, 0.7, 0.7, 1.1, 1.0, 0.85, 0.35) // 액션
+        }
+        audioSubGain = values.sub; audioBassGain = values.bass; audioMidGain = values.mid
+        audioSharpness = values.sharp; audioImpact = values.impact; audioWidth = values.width
+        audioAttack = values.attack; audioRelease = values.release
+    }
+
     /// 게임이 보내는 진동도 같이 쓰기 (기본 켬)
     var audioHapticsWithRumble: Bool {
         get { bool("audioHapticsWithRumble", default: true) }

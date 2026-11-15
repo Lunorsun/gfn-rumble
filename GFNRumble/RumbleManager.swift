@@ -17,8 +17,8 @@ private final class Motor {
         self.locality = locality
     }
 
-    /// 세기 0.0 ~ 1.0. 0이면 멈춥니다.
-    func set(_ amplitude: Float) {
+    /// 세기 0.0 ~ 1.0. 0이면 멈춥니다. 날카로움 0.0(묵직) ~ 1.0(또렷)
+    func set(_ amplitude: Float, sharpness: Float = 0.5) {
         let value = max(0, min(1, amplitude))
 
         if value < 0.005 {
@@ -40,8 +40,9 @@ private final class Motor {
             if player == nil {
                 // 기본 세기는 1.0으로 두고, 실제 세기는 아래 동적 파라미터로 곱해집니다.
                 let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
+                let baseSharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
                 let event = CHHapticEvent(eventType: .hapticContinuous,
-                                          parameters: [intensity],
+                                          parameters: [intensity, baseSharpness],
                                           relativeTime: 0,
                                           duration: TimeInterval(GCHapticDurationInfinite))
                 let pattern = try CHHapticPattern(events: [event], parameters: [])
@@ -52,15 +53,39 @@ private final class Motor {
             let control = CHHapticDynamicParameter(parameterID: .hapticIntensityControl,
                                                    value: value,
                                                    relativeTime: 0)
-            try player.sendParameters([control], atTime: CHHapticTimeImmediate)
+            // 날카로움은 기본값(0.5)에 더해지는 값이라 -0.5 ~ +0.5로 보냅니다.
+            let sharp = CHHapticDynamicParameter(parameterID: .hapticSharpnessControl,
+                                                 value: max(0, min(1, sharpness)) - 0.5,
+                                                 relativeTime: 0)
+            try player.sendParameters([control, sharp], atTime: CHHapticTimeImmediate)
             if !isPlaying {
                 try player.start(atTime: CHHapticTimeImmediate)
                 isPlaying = true
-                try player.sendParameters([control], atTime: CHHapticTimeImmediate)
+                try player.sendParameters([control, sharp], atTime: CHHapticTimeImmediate)
             }
         } catch {
             invalidate()
         }
+    }
+
+    /// 짧고 또렷한 '탁' 한 번 (계속 울리는 진동과 따로 겹쳐 울림)
+    func tap(_ amplitude: Float, sharpness: Float) {
+        let value = max(0, min(1, amplitude))
+        guard value > 0.01 else { return }
+        if engine == nil {
+            engine = makeEngine()
+            player = nil
+            isPlaying = false
+        }
+        guard let engine = engine else { return }
+        do {
+            let event = CHHapticEvent(eventType: .hapticTransient, parameters: [
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: value),
+                CHHapticEventParameter(parameterID: .hapticSharpness, value: max(0, min(1, sharpness)))
+            ], relativeTime: 0)
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            try engine.makePlayer(with: pattern).start(atTime: CHHapticTimeImmediate)
+        } catch {}
     }
 
     func shutdown() {
@@ -141,6 +166,7 @@ private final class Rig {
     // 두 층을 섞어서(더 큰 값) 울립니다: 게임 진동 층 + 추가 햅틱 층(방아쇠 햅틱·게임 소리 햅틱)
     private var game: (s: Float, w: Float, lt: Float, rt: Float) = (0, 0, 0, 0)
     private var extra: (s: Float, w: Float) = (0, 0)
+    private var extraSharp: (s: Float, w: Float) = (0.5, 0.5)
     var pendingExtraStop: DispatchWorkItem?
 
     /// 게임 진동 층
@@ -150,16 +176,30 @@ private final class Rig {
     }
 
     /// 추가 햅틱 층
-    func applyExtra(strong s: Float, weak w: Float) {
+    func applyExtra(strong s: Float, weak w: Float, sharpStrong: Float = 0.5, sharpWeak: Float = 0.5) {
         extra = (s, w)
+        extraSharp = (sharpStrong, sharpWeak)
         output()
+    }
+
+    /// 왼쪽(strong)·오른쪽(weak) 손잡이에 '탁' 한 번
+    func tap(left: Float, right: Float, sharpness: Float) {
+        if let strong = strong, let weak = weak {
+            strong.tap(left, sharpness: sharpness)
+            weak.tap(right, sharpness: sharpness)
+        } else {
+            combined?.tap(max(left, right), sharpness: sharpness)
+        }
     }
 
     private func output() {
         let s = max(game.s, extra.s), w = max(game.w, extra.w)
-        strong?.set(s)
-        weak?.set(w)
-        combined?.set(max(s, w))
+        // 추가 햅틱이 더 크면 그 날카로움을, 아니면 기본(0.5)을 씁니다.
+        let ss: Float = extra.s > game.s ? extraSharp.s : 0.5
+        let ws: Float = extra.w > game.w ? extraSharp.w : 0.5
+        strong?.set(s, sharpness: ss)
+        weak?.set(w, sharpness: ws)
+        combined?.set(max(s, w), sharpness: max(s, w) == s ? ss : ws)
         leftTrigger?.set(game.lt)
         rightTrigger?.set(game.rt)
     }
@@ -276,6 +316,27 @@ final class RumbleManager {
         let stop = DispatchWorkItem { [weak rig] in rig?.applyExtra(strong: 0, weak: 0) }
         rig.pendingExtraStop = stop
         DispatchQueue.main.asyncAfter(deadline: .now() + min(max(durationMs, 10), 1000) / 1000, execute: stop)
+    }
+
+    /// 게임 소리 햅틱: 왼·오른쪽 세기와 날카로움. 다음 값이 오지 않으면 holdMs 뒤 멈춤.
+    func audioFrame(_ controller: GCController, left: Double, right: Double,
+                    sharpLeft: Double, sharpRight: Double, holdMs: Double) {
+        guard let rig = rig(for: controller) else { return }
+        let gain = AppSettings.shared.rumbleGain
+        func scaled(_ v: Double) -> Float { v > 0.005 ? Float(min(1, v * gain)) : 0 }
+        rig.pendingExtraStop?.cancel()
+        rig.applyExtra(strong: scaled(left), weak: scaled(right),
+                       sharpStrong: Float(sharpLeft), sharpWeak: Float(sharpRight))
+        let stop = DispatchWorkItem { [weak rig] in rig?.applyExtra(strong: 0, weak: 0) }
+        rig.pendingExtraStop = stop
+        DispatchQueue.main.asyncAfter(deadline: .now() + holdMs / 1000, execute: stop)
+    }
+
+    /// 게임 소리 햅틱: 타격음 '탁'
+    func audioTap(_ controller: GCController, left: Double, right: Double, sharpness: Double) {
+        guard let rig = rig(for: controller) else { return }
+        let gain = AppSettings.shared.rumbleGain
+        rig.tap(left: Float(min(1, left * gain)), right: Float(min(1, right * gain)), sharpness: Float(sharpness))
     }
 
     func controllerStatus() -> String {
