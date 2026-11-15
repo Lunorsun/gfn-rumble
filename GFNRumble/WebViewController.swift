@@ -268,12 +268,16 @@ final class WebViewController: UIViewController {
 
     private func showStatus() {
         let manager = RumbleManager.shared
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
         let lines = [
+            "앱 버전: build-\(build)",
             "브리지 파일: " + (bridgeScriptLoaded ? "있음" : "없음 (빌드 문제)"),
             "브리지 실행: " + (bridgeReady ? (bridgeInstalled ? "정상" : "실행됐지만 설치 실패") : "아직 안 됨"),
             "지포스 나우가 진동 기능을 확인함: " + (pageCheckedRumble ? "예" : "아직 아니오"),
             "웹에서 받은 진동 명령: \(manager.webCommandCount)회",
             "마지막 명령: \(manager.lastWebCommand)",
+            "소리 햅틱: " + (AppSettings.shared.audioHapticsEnabled ? "켜짐" : "꺼짐") + " · 받은 값 \(AudioHaptics.shared.frameCount)회 · 마지막 \(AudioHaptics.shared.lastText)",
+            "게임 진동도 같이: " + (AppSettings.shared.audioHapticsWithRumble ? "예" : "아니오"),
             "",
             "컨트롤러",
             manager.controllerStatus(),

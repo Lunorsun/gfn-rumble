@@ -13,9 +13,14 @@ final class AudioHaptics: NSObject, WKScriptMessageHandler {
     private var level: (l: Double, r: Double) = (0, 0)
     private var sharp: (l: Double, r: Double) = (0.5, 0.5)
 
+    /// 진단용: 받은 횟수와 마지막 값
+    private(set) var frameCount = 0
+    private(set) var lastText = "없음"
+
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
         let s = AppSettings.shared
+        frameCount += 1
         guard s.audioHapticsEnabled,
               let body = message.body as? [String: Any],
               let raw = body["v"] as? [NSNumber], raw.count == 8,
@@ -57,6 +62,7 @@ final class AudioHaptics: NSObject, WKScriptMessageHandler {
         level = (follow(level.l, targetL), follow(level.r, targetR))
         sharp = (sharp.l + (left.sharpness - sharp.l) * 0.5, sharp.r + (right.sharpness - sharp.r) * 0.5)
 
+        lastText = String(format: "왼 %.2f / 오 %.2f", level.l, level.r)
         RumbleManager.shared.audioFrame(controller, left: level.l, right: level.r,
                                         sharpLeft: sharp.l, sharpRight: sharp.r, holdMs: 120)
 

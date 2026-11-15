@@ -40,6 +40,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             build 2>&1 | tee build.log
 
       # 컴파일 오류를 공개 주석(annotation)으로 남겨서 바로 볼 수 있게
