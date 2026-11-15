@@ -23,20 +23,23 @@ final class AudioHaptics: NSObject, WKScriptMessageHandler {
         frameCount += 1
         guard s.audioHapticsEnabled,
               let body = message.body as? [String: Any],
-              let raw = body["v"] as? [NSNumber], raw.count == 8,
+              let raw = body["v"] as? [NSNumber], raw.count == 14,
               let controller = target() else { return }
         let v = raw.map { min(1, max(0, $0.doubleValue.isFinite ? $0.doubleValue : 0)) }
-        // v: 0,1 초저음 / 2,3 저음 / 4,5 중고음 / 6,7 타격  (짝수 = 왼쪽, 홀수 = 오른쪽)
+        // v: 음역 5개 × (왼, 오) = 0~9 [초저음, 저음, 중음, 중고음, 고음], 10·11 킥(쿠웅), 12·13 타격(탁)
 
-        // 1) 한쪽의 세기와 날카로움: 초저음은 묵직(0.1), 저음은 중간(0.4), 중고음은 또렷(0.95)
+        // 1) 한쪽의 세기와 날카로움: 음역마다 고유한 날카로움을 섞어 '음색'을 만듭니다.
+        let gains = [s.audioSubGain, s.audioBassGain, s.audioLowMidGain, s.audioMidGain, s.audioHighGain]
+        let tone: [Double] = [0.05, 0.3, 0.5, 0.8, 1.0]
         func side(_ i: Int) -> (amount: Double, sharpness: Double) {
-            let sub = v[0 + i] * s.audioSubGain
-            let bass = v[2 + i] * s.audioBassGain
-            let mid = v[4 + i] * s.audioMidGain
-            let total = sub + bass + mid
+            var total = 0.0, weighted = 0.0
+            for b in 0..<5 {
+                let e = v[b * 2 + i] * gains[b]
+                total += e
+                weighted += e * tone[b]
+            }
             guard total > 0.0001 else { return (0, 0.5) }
-            let mixed = (sub * 0.1 + bass * 0.4 + mid * 0.95) / total
-            let sharpness = 0.5 + (mixed - 0.5) * s.audioSharpness
+            let sharpness = 0.5 + (weighted / total - 0.5) * s.audioSharpness
             return (total, sharpness)
         }
         var left = side(0), right = side(1)
@@ -64,19 +67,24 @@ final class AudioHaptics: NSObject, WKScriptMessageHandler {
 
         lastText = String(format: "왼 %.2f / 오 %.2f", level.l, level.r)
         RumbleManager.shared.audioFrame(controller, left: level.l, right: level.r,
-                                        sharpLeft: sharp.l, sharpRight: sharp.r, holdMs: 120)
+                                        sharpLeft: sharp.l, sharpRight: sharp.r, holdMs: 80)
 
-        // 5) 타격음 '탁' (같은 공간 폭 적용)
-        let hitL = v[6], hitR = v[7]
-        if hitL > 0 || hitR > 0 {
-            let hc = (hitL + hitR) / 2
-            let tl = max(0, hc + (hitL - hc) * s.audioWidth) * s.audioImpact
-            let tr = max(0, hc + (hitR - hc) * s.audioWidth) * s.audioImpact
-            RumbleManager.shared.audioTap(controller, left: tl, right: tr,
+        // 5) 킥 '쿠웅'(묵직)과 타격 '탁'(또렷) — 같은 공간 폭 적용
+        func spread(_ l: Double, _ r: Double) -> (Double, Double) {
+            let c = (l + r) / 2
+            return (max(0, c + (l - c) * s.audioWidth) * s.audioImpact,
+                    max(0, c + (r - c) * s.audioWidth) * s.audioImpact)
+        }
+        if v[10] > 0 || v[11] > 0 {
+            let k = spread(v[10], v[11])
+            RumbleManager.shared.audioTap(controller, left: k.0, right: k.1, sharpness: 0.15)
+        }
+        if v[12] > 0 || v[13] > 0 {
+            let h = spread(v[12], v[13])
+            RumbleManager.shared.audioTap(controller, left: h.0 * 0.8, right: h.1 * 0.8,
                                           sharpness: 0.6 + 0.4 * s.audioSharpness)
         }
     }
-
     private func target() -> GCController? {
         // 듀얼센스에서만 동작합니다.
         GCController.controllers().first(where: { $0.haptics != nil && $0.physicalInputProfile is GCDualSenseGamepad })

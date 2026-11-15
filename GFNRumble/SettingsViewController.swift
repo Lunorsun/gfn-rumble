@@ -158,7 +158,7 @@ final class SettingsViewController: UITableViewController {
                     ]),
 
             Section(title: "게임 소리 → 햅틱 (실험)",
-                    footer: "게임 소리를 앱 안에서만 초저음·저음·중고음으로 나눠 분석해요. 폭발은 묵직하게, 총소리는 또렷하게, 왼쪽 소리는 왼쪽 손잡이로 울려요. 녹음·저장·전송은 없어요. 안 울리면 게임 화면을 한 번 터치해 주세요.",
+                    footer: "게임 소리를 앱 안에서만 5개 음역으로 나눠 1초에 120번 분석하고, 킥드럼·폭발은 '쿠웅', 총소리·스네어는 '탁'으로 따로 울려요. 폭발은 묵직하게, 총소리는 또렷하게, 왼쪽 소리는 왼쪽 손잡이로 울려요. 녹음·저장·전송은 없어요. 안 울리면 게임 화면을 한 번 터치해 주세요.",
                     rows: [
                         .toggle(title: "게임 소리 → 햅틱", get: { s.audioHapticsEnabled },
                                 set: { s.audioHapticsEnabled = $0 }, confirmOn: nil),
@@ -175,7 +175,7 @@ final class SettingsViewController: UITableViewController {
                                 get: { s.audioMidGain }, set: { s.audioMidGain = $0 }),
                         .slider(title: "날카로움 차이", range: 0...1, format: Self.percent,
                                 get: { s.audioSharpness }, set: { s.audioSharpness = $0 }),
-                        .slider(title: "타격감 ('탁')", range: 0...2, format: Self.percent,
+                        .slider(title: "타격감 (쿠웅·탁)", range: 0...2, format: Self.percent,
                                 get: { s.audioImpact }, set: { s.audioImpact = $0 }),
                         .slider(title: "공간 폭 (좌우)", range: 0...2, format: Self.percent,
                                 get: { s.audioWidth }, set: { s.audioWidth = $0 }),

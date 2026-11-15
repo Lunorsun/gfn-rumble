@@ -275,6 +275,16 @@ final class AppSettings {
         set { set(newValue, "audioMidGain", range: 0...2) }
     }
 
+    /// 중음(목소리·악기 몸통, 기본 0 = 대화에 안 떨리게), 고음(하이햇·금속)
+    var audioLowMidGain: Double {
+        get { double("audioLowMidGain", default: 0.0, range: 0...2) }
+        set { set(newValue, "audioLowMidGain", range: 0...2) }
+    }
+    var audioHighGain: Double {
+        get { double("audioHighGain", default: 0.3, range: 0...2) }
+        set { set(newValue, "audioHighGain", range: 0...2) }
+    }
+
     /// 날카로움 차이 0 ~ 1 (0 = 모두 같은 느낌, 1 = 폭발은 묵직·총소리는 또렷)
     var audioSharpness: Double {
         get { double("audioSharpness", default: 0.7, range: 0...1) }
@@ -303,14 +313,16 @@ final class AppSettings {
         set { set(newValue, "audioRelease", range: 0...1) }
     }
 
-    /// 프리셋: 0 = 액션, 1 = 레이싱, 2 = FPS
+    /// 프리셋: 0 = 액션, 1 = 레이싱, 2 = FPS, 3 = 음악처럼
     func applyAudioPreset(_ preset: Int) {
-        let values: (sub: Double, bass: Double, mid: Double, sharp: Double, impact: Double, width: Double, attack: Double, release: Double)
+        let values: (sub: Double, bass: Double, lowMid: Double, mid: Double, high: Double, sharp: Double, impact: Double, width: Double, attack: Double, release: Double)
         switch preset {
-        case 1:  values = (1.4, 0.9, 0.3, 0.4, 0.4, 0.8, 0.6, 0.2)   // 레이싱: 엔진 몸통 위주, 부드럽게
-        case 2:  values = (0.6, 0.8, 1.2, 1.0, 1.6, 1.4, 1.0, 0.6)   // FPS: 총소리 또렷, 방향감 크게
-        default: values = (1.1, 1.0, 0.7, 0.7, 1.1, 1.0, 0.85, 0.35) // 액션
+        case 1:  values = (1.4, 0.9, 0.0, 0.3, 0.0, 0.4, 0.4, 0.8, 0.6, 0.2)   // 레이싱: 엔진 몸통 위주, 부드럽게
+        case 2:  values = (0.6, 0.8, 0.0, 1.2, 0.6, 1.0, 1.6, 1.4, 1.0, 0.6)   // FPS: 총소리 또렷, 방향감 크게
+        case 3:  values = (1.2, 1.0, 0.6, 0.8, 0.7, 1.0, 1.2, 1.0, 1.0, 0.7)   // 음악처럼: 모든 음역, 빠르게
+        default: values = (1.1, 1.0, 0.0, 0.7, 0.3, 0.7, 1.1, 1.0, 0.85, 0.35) // 액션
         }
+        audioLowMidGain = values.lowMid; audioHighGain = values.high
         audioSubGain = values.sub; audioBassGain = values.bass; audioMidGain = values.mid
         audioSharpness = values.sharp; audioImpact = values.impact; audioWidth = values.width
         audioAttack = values.attack; audioRelease = values.release
