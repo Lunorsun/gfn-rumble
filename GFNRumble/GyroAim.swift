@@ -11,6 +11,7 @@ final class GyroAim: NSObject {
     private var x: Double = 0
     private var y: Double = 0
     private var lastSentZero = true
+    private var lastSent: (x: Double, y: Double) = (0, 0)
     private var inFlight = false
 
     init(webView: @escaping () -> WKWebView?) {
@@ -86,8 +87,11 @@ final class GyroAim: NSObject {
     private func send(_ x: Double, _ y: Double) {
         let zero = abs(x) < 0.001 && abs(y) < 0.001
         if zero && lastSentZero { return }
+        // 거의 안 바뀌었으면 보내지 않아 게임 화면의 부담을 줄입니다.
+        if !zero && !lastSentZero && abs(x - lastSent.x) < 0.004 && abs(y - lastSent.y) < 0.004 { return }
         guard !inFlight, let webView = webView() else { return }
         lastSentZero = zero
+        lastSent = (x, y)
         inFlight = true
         let script = String(format: "window.__gfnGyro&&window.__gfnGyro.set(%.4f,%.4f)", zero ? 0 : x, zero ? 0 : y)
         webView.evaluateJavaScript(script) { [weak self] _, _ in self?.inFlight = false }

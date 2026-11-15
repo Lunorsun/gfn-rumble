@@ -20,6 +20,7 @@ final class WebViewController: UIViewController {
     // 실험 기능
     private let mouseModeOn = AppSettings.shared.mouseModeEnabled   // 앱을 다시 켜야 바뀜
     private var mouseInput: MouseInput?
+    private var focusTimer: Timer?
     private lazy var gyroAim = GyroAim { [weak self] in self?.webView }
     private let tvLabel = UILabel()
 
@@ -173,6 +174,7 @@ final class WebViewController: UIViewController {
     }
 
     @objc private func appBecameActive() {
+        if presentedViewController == nil { activeWebView.becomeFirstResponder() }
         ExpiryMonitor.shared.refresh()
         if let text = ExpiryMonitor.shared.bannerText() {
             WarningCenter.shared.show(text)
@@ -186,7 +188,22 @@ final class WebViewController: UIViewController {
     @objc private func openSettings() {
         let navigation = UINavigationController(rootViewController: SettingsViewController())
         navigation.modalPresentationStyle = .formSheet
-        present(navigation, animated: true)
+        presentAndRestoreFocus(navigation)
+    }
+
+    /// 메뉴·설정 창이 닫히면 게임 화면을 다시 '선택'해서 컨트롤러 입력이 끊기지 않게 합니다.
+    /// (웹킷은 선택된 웹뷰에만 컨트롤러 입력을 줍니다)
+    private func presentAndRestoreFocus(_ controller: UIViewController) {
+        present(controller, animated: true)
+        focusTimer?.invalidate()
+        focusTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] timer in
+            guard let self = self else { timer.invalidate(); return }
+            if self.presentedViewController == nil {
+                timer.invalidate()
+                self.focusTimer = nil
+                self.activeWebView.becomeFirstResponder()
+            }
+        }
     }
 
     /// 아이패드 Safari가 보내는 것과 같은 브라우저 정보
@@ -233,7 +250,7 @@ final class WebViewController: UIViewController {
 
         sheet.popoverPresentationController?.sourceView = menuButton
         sheet.popoverPresentationController?.sourceRect = menuButton.bounds
-        present(sheet, animated: true)
+        presentAndRestoreFocus(sheet)
     }
 
     private var activeWebView: WKWebView { popup ?? webView }
@@ -290,7 +307,7 @@ final class WebViewController: UIViewController {
     private func showInfo(_ title: String, _ message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "확인", style: .default))
-        present(alert, animated: true)
+        presentAndRestoreFocus(alert)
     }
 
     // MARK: - 팝업 창
