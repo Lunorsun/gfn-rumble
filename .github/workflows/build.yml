@@ -41,6 +41,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            MARKETING_VERSION=1.0.${{ github.run_number }} \
             build 2>&1 | tee build.log
 
       # 컴파일 오류를 공개 주석(annotation)으로 남겨서 바로 볼 수 있게
@@ -60,6 +61,47 @@ jobs:
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qr GFNRumble.ipa Payload
+
+      # SideStore 소스: 한 번 등록하면 SideStore에서 'Update'로 덮어쓰기 설치 (로그인 유지)
+      - name: Make SideStore source
+        env:
+          RUN: ${{ github.run_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, datetime
+          run = os.environ["RUN"]; repo = os.environ["REPO"]
+          size = os.path.getsize("GFNRumble.ipa")
+          now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          source = {
+            "name": "GFN Rumble",
+            "identifier": "io.github.lunorsun.gfnrumble",
+            "subtitle": "지포스 나우 진동 앱",
+            "apps": [{
+              "name": "GFN Rumble",
+              "bundleIdentifier": "com.gfnrumble.app",
+              "developerName": "Lunorsun",
+              "subtitle": "지포스 나우에 컨트롤러 진동을 더해요",
+              "localizedDescription": "아이패드 지포스 나우용 진동·햅틱 앱",
+              "iconURL": f"https://opengraph.githubassets.com/1/{repo}",
+              "tintColor": "76B900",
+              "category": "utilities",
+              "versions": [{
+                "version": f"1.0.{run}",
+                "buildVersion": run,
+                "date": now,
+                "localizedDescription": f"빌드 {run}",
+                "downloadURL": f"https://github.com/{repo}/releases/download/build-{run}/GFNRumble.ipa",
+                "size": size,
+                "minOSVersion": "15.0"
+              }],
+              "appPermissions": {"entitlements": [], "privacy": {}}
+            }],
+            "news": []
+          }
+          json.dump(source, open("source.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          PY
+          cat source.json
 
       # 실패하면 오류 내용을 실행 결과 첫 화면(Summary)에 적어 둡니다.
       - name: Summarize failure
@@ -94,4 +136,6 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: GFN 진동 빌드 ${{ github.run_number }}
-          files: GFNRumble.ipa
+          files: |
+            GFNRumble.ipa
+            source.json
