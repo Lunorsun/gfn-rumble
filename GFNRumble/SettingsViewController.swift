@@ -153,6 +153,23 @@ final class SettingsViewController: UITableViewController {
                                 get: { s.gyroSmoothing }, set: { s.gyroSmoothing = $0 })
                     ]),
 
+            Section(title: "게임 소리 → 햅틱 (실험)",
+                    footer: "게임 소리를 앱 안에서만 분석해 폭발·총소리·엔진 같은 저음에 맞춰 손잡이를 울려요. 녹음·저장·전송은 없어요. 듀얼센스에서 가장 잘 느껴져요. 안 울리면 게임 화면을 한 번 터치해 주세요.",
+                    rows: [
+                        .toggle(title: "게임 소리 → 햅틱", get: { s.audioHapticsEnabled },
+                                set: { s.audioHapticsEnabled = $0 }, confirmOn: nil),
+                        .slider(title: "세기", range: 0.2...3.0, format: Self.times,
+                                get: { s.audioHapticsGain }, set: { s.audioHapticsGain = $0 }),
+                        .slider(title: "작은 소리 무시", range: 0...0.5, format: Self.percent,
+                                get: { s.audioHapticsThreshold }, set: { s.audioHapticsThreshold = $0 }),
+                        .segmented(title: "음역", items: ["저음만", "저음+중음"],
+                                   get: { s.audioHapticsBand }, set: { s.audioHapticsBand = $0 }),
+                        .toggle(title: "좌우 분리", get: { s.audioHapticsStereo },
+                                set: { s.audioHapticsStereo = $0 }, confirmOn: nil),
+                        .toggle(title: "게임 진동도 같이 쓰기", get: { s.audioHapticsWithRumble },
+                                set: { s.audioHapticsWithRumble = $0 }, confirmOn: nil)
+                    ]),
+
             Section(title: "보안", footer: nil, rows: [
                 .info("설정은 이 아이패드에만 저장돼요. 이 앱은 지포스 나우 외의 인터넷 주소에 접속하지 않고, 개인정보를 모으거나 보내지 않아요.")
             ])

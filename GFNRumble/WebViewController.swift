@@ -84,12 +84,13 @@ final class WebViewController: UIViewController {
         contentController.add(self, name: "rumble")
         contentController.add(SessionAlerts.shared, name: SessionAlerts.handlerName)
         contentController.add(QualityAlerts.shared, name: QualityAlerts.handlerName)
+        contentController.add(AudioHaptics.shared, name: AudioHaptics.handlerName)
 
         // 설정 전달 통로를 가장 먼저 넣습니다.
         contentController.addUserScript(WKUserScript(source: Self.configHubScript(),
                                                      injectionTime: .atDocumentStart,
                                                      forMainFrameOnly: false))
-        var scripts = ["rumble-bridge", "gamepad-tweaks", "video-fit", "session-watch", "resolution-2k"]
+        var scripts = ["rumble-bridge", "gamepad-tweaks", "video-fit", "session-watch", "resolution-2k", "audio-haptics"]
         if mouseModeOn { scripts.append("pointer-lock") }
         for name in scripts {
             guard let url = Bundle.main.url(forResource: name, withExtension: "js"),

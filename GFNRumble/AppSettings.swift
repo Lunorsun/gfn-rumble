@@ -230,6 +230,43 @@ final class AppSettings {
         set { set(newValue, "gyroSmoothing", range: 0.0...0.9) }
     }
 
+    // MARK: - 게임 소리 → 햅틱 (실험)
+
+    var audioHapticsEnabled: Bool {
+        get { bool("audioHapticsEnabled", default: false) }
+        set { defaults.set(newValue, forKey: key("audioHapticsEnabled")); notify() }
+    }
+
+    /// 세기 0.2 ~ 3.0 (기본 1.0)
+    var audioHapticsGain: Double {
+        get { double("audioHapticsGain", default: 1.0, range: 0.2...3.0) }
+        set { set(newValue, "audioHapticsGain", range: 0.2...3.0) }
+    }
+
+    /// 민감도: 이보다 작은 소리는 무시 0.0 ~ 0.5 (기본 0.08)
+    var audioHapticsThreshold: Double {
+        get { double("audioHapticsThreshold", default: 0.08, range: 0.0...0.5) }
+        set { set(newValue, "audioHapticsThreshold", range: 0.0...0.5) }
+    }
+
+    /// 음역: 0 = 저음만, 1 = 저음+중음
+    var audioHapticsBand: Int {
+        get { min(max(defaults.integer(forKey: key("audioHapticsBand")), 0), 1) }
+        set { defaults.set(min(max(newValue, 0), 1), forKey: key("audioHapticsBand")); notify() }
+    }
+
+    /// 좌우 분리: 왼쪽 소리 → 왼쪽 손잡이 (기본 켬)
+    var audioHapticsStereo: Bool {
+        get { bool("audioHapticsStereo", default: true) }
+        set { defaults.set(newValue, forKey: key("audioHapticsStereo")); notify() }
+    }
+
+    /// 게임이 보내는 진동도 같이 쓰기 (기본 켬)
+    var audioHapticsWithRumble: Bool {
+        get { bool("audioHapticsWithRumble", default: true) }
+        set { defaults.set(newValue, forKey: key("audioHapticsWithRumble")); notify() }
+    }
+
     // MARK: - 웹페이지로 넘기는 설정
 
     /// 웹페이지(JS)에 넘길 설정. 개인정보는 들어가지 않습니다.
@@ -247,7 +284,9 @@ final class AppSettings {
             "request2K": request2K,
             "resWidth": Self.resolutionPresets[resolutionPreset].width,
             "resHeight": Self.resolutionPresets[resolutionPreset].height,
-            "gyro": gyroEnabled
+            "gyro": gyroEnabled,
+            "audioHaptics": audioHapticsEnabled,
+            "audioHapticsBand": audioHapticsBand
         ]
     }
 

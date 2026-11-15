@@ -201,6 +201,9 @@ final class RumbleManager {
                        durationMs: Double, delayMs: Double) {
         webCommandCount += 1
         lastWebCommand = String(format: "강 %.2f / 약 %.2f / %.0fms", strong, weak, durationMs)
+        // '게임 소리 → 햅틱'만 쓰도록 설정했으면 게임 진동은 무시합니다.
+        let settings = AppSettings.shared
+        if settings.audioHapticsEnabled && !settings.audioHapticsWithRumble { return }
         guard let controller = controller(webIndex: webIndex, id: id) else { return }
         drive(controller,
               strong: strong, weak: weak,
