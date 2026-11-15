@@ -122,7 +122,7 @@ final class TriggerDetailViewController: UITableViewController {
         case .mode: return "방아쇠 자체 효과 (듀얼센스)"
         case .params: return "효과 설정"
         case .zones: return "구간별 세기 (1칸 = 방아쇠 10%)"
-        case .haptic: return "손잡이 햅틱 (모든 진동 컨트롤러)"
+        case .haptic: return "손잡이 햅틱"
         }
     }
 

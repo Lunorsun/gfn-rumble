@@ -1,3 +1,4 @@
+import GameController
 import UIKit
 
 /// 설정 화면. 모든 값은 AppSettings(이 아이패드 안)에만 저장됩니다.
@@ -32,6 +33,9 @@ final class SettingsViewController: UITableViewController {
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "닫기", style: .done,
                                                             target: self, action: #selector(close))
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(controllersChanged), name: .GCControllerDidConnect, object: nil)
+        center.addObserver(self, selector: #selector(controllersChanged), name: .GCControllerDidDisconnect, object: nil)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -67,7 +71,7 @@ final class SettingsViewController: UITableViewController {
             ]),
 
             Section(title: "방아쇠 효과·햅틱",
-                    footer: "게임과 상관없이 직접 정한 효과예요. 방아쇠 자체 효과는 듀얼센스만, 손잡이 햅틱(단발·연사)은 진동되는 모든 컨트롤러에서 돼요. 저장 칸에 게임별 설정을 넣어 두고 바꿔 끼세요.",
+                    footer: "게임과 상관없이 직접 정한 효과예요. 듀얼센스 전용이에요. 게임 진동과 섞여서 함께 느껴져요. 저장 칸에 게임별 설정을 넣어 두고 바꿔 끼세요.",
                     rows: [
                         .action(title: "L2 상세 설정 — " + s.leftTrigger.mode.title) { [weak self] in
                             self?.navigationController?.pushViewController(TriggerDetailViewController(left: true), animated: true)
@@ -174,6 +178,20 @@ final class SettingsViewController: UITableViewController {
                 .info("설정은 이 아이패드에만 저장돼요. 이 앱은 지포스 나우 외의 인터넷 주소에 접속하지 않고, 개인정보를 모으거나 보내지 않아요.")
             ])
         ]
+
+        // 듀얼센스 전용 설정은 듀얼센스가 연결됐을 때만 보여 줍니다.
+        if !TriggerEffects.isDualSenseConnected {
+            let dualSenseOnly: Set<String> = ["방아쇠 효과·햅틱", "자이로 조준 (듀얼센스)", "게임 소리 → 햅틱 (실험)"]
+            sections = sections.filter { !dualSenseOnly.contains($0.title ?? "") }
+            sections.insert(Section(title: "듀얼센스 전용", footer: nil, rows: [
+                .info("듀얼센스를 연결하면 방아쇠 효과·햅틱, 자이로 조준, 게임 소리 햅틱 설정이 나타나요.")
+            ]), at: min(2, sections.count))
+        }
+    }
+
+    @objc private func controllersChanged() {
+        buildSections()
+        tableView.reloadData()
     }
 
     // MARK: - 표

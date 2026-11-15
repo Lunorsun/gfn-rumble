@@ -3,11 +3,16 @@ import UIKit
 
 /// 방아쇠 효과 두 가지를 담당합니다. 게임과 상관없이 설정대로 동작합니다.
 /// 1) 듀얼센스 방아쇠 자체 효과 (저항·경사·총·진동·구간)
-/// 2) 방아쇠를 당길 때 손잡이 모터로 주는 햅틱 (단발 '퉁' / 연사 '투투투') — 진동 모터가 있는 모든 컨트롤러
+/// 2) 방아쇠를 당길 때 손잡이 모터로 주는 햅틱 (단발 '퉁' / 연사 '투투투') — 듀얼센스 전용
 /// 앱이 뒤로 가면 효과를 끕니다. 메인 스레드에서만 사용합니다.
 final class TriggerEffects: NSObject {
 
     static let shared = TriggerEffects()
+
+    /// 듀얼센스가 연결돼 있는지 (듀얼센스 전용 설정을 보여 줄지)
+    static var isDualSenseConnected: Bool {
+        GCController.controllers().contains { $0.physicalInputProfile is GCDualSenseGamepad }
+    }
 
     private var started = false
     private var link: CADisplayLink?
@@ -140,7 +145,7 @@ final class TriggerEffects: NSObject {
         let settings = AppSettings.shared
         let now = CACurrentMediaTime()
         for controller in GCController.controllers() {
-            guard let pad = controller.extendedGamepad else { continue }
+            guard controller.physicalInputProfile is GCDualSenseGamepad, let pad = controller.extendedGamepad else { continue }
             let id = String(describing: ObjectIdentifier(controller))
             handle(settings.leftTrigger, value: pad.leftTrigger.value, key: id + "L",
                    left: true, controller: controller, now: now)

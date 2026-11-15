@@ -138,12 +138,30 @@ private final class Rig {
         if strong == nil && combined == nil { return nil }
     }
 
+    // 두 층을 섞어서(더 큰 값) 울립니다: 게임 진동 층 + 추가 햅틱 층(방아쇠 햅틱·게임 소리 햅틱)
+    private var game: (s: Float, w: Float, lt: Float, rt: Float) = (0, 0, 0, 0)
+    private var extra: (s: Float, w: Float) = (0, 0)
+    var pendingExtraStop: DispatchWorkItem?
+
+    /// 게임 진동 층
     func apply(strong s: Float, weak w: Float, leftTrigger lt: Float, rightTrigger rt: Float) {
+        game = (s, w, lt, rt)
+        output()
+    }
+
+    /// 추가 햅틱 층
+    func applyExtra(strong s: Float, weak w: Float) {
+        extra = (s, w)
+        output()
+    }
+
+    private func output() {
+        let s = max(game.s, extra.s), w = max(game.w, extra.w)
         strong?.set(s)
         weak?.set(w)
         combined?.set(max(s, w))
-        leftTrigger?.set(lt)
-        rightTrigger?.set(rt)
+        leftTrigger?.set(game.lt)
+        rightTrigger?.set(game.rt)
     }
 
     func cancelPending() {
@@ -155,11 +173,15 @@ private final class Rig {
 
     func stop() {
         cancelPending()
+        pendingExtraStop?.cancel()
+        pendingExtraStop = nil
+        extra = (0, 0)
         apply(strong: 0, weak: 0, leftTrigger: 0, rightTrigger: 0)
     }
 
     func shutdown() {
         cancelPending()
+        pendingExtraStop?.cancel()
         [strong, weak, combined, leftTrigger, rightTrigger].forEach { $0?.shutdown() }
     }
 }
@@ -244,9 +266,16 @@ final class RumbleManager {
     }
 
     /// 방아쇠 햅틱용: 특정 컨트롤러 손잡이를 짧게 울립니다.
+    /// 게임 진동을 끊지 않고 그 위에 더해집니다(더 큰 쪽이 느껴짐).
     func kick(_ controller: GCController, strong: Double, weak: Double, durationMs: Double) {
-        drive(controller, strong: strong, weak: weak, leftTrigger: 0, rightTrigger: 0,
-              durationMs: durationMs, delayMs: 0)
+        guard let rig = rig(for: controller) else { return }
+        let gain = AppSettings.shared.rumbleGain
+        func scaled(_ v: Double) -> Float { v > 0.005 ? Float(min(1, v * gain)) : 0 }
+        rig.pendingExtraStop?.cancel()
+        rig.applyExtra(strong: scaled(strong), weak: scaled(weak))
+        let stop = DispatchWorkItem { [weak rig] in rig?.applyExtra(strong: 0, weak: 0) }
+        rig.pendingExtraStop = stop
+        DispatchQueue.main.asyncAfter(deadline: .now() + min(max(durationMs, 10), 1000) / 1000, execute: stop)
     }
 
     func controllerStatus() -> String {

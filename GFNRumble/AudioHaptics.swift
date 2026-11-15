@@ -2,7 +2,7 @@ import GameController
 import WebKit
 
 /// 게임 소리 → 햅틱 (실험). 웹페이지(audio-haptics.js)가 보내는 저음 세기(왼쪽·오른쪽 숫자)만 받아
-/// 컨트롤러 손잡이를 울립니다. 듀얼센스를 먼저 고르고, 없으면 진동되는 아무 컨트롤러를 씁니다.
+/// 듀얼센스 손잡이를 울립니다(듀얼센스 전용).
 final class AudioHaptics: NSObject, WKScriptMessageHandler {
 
     static let shared = AudioHaptics()
@@ -34,7 +34,7 @@ final class AudioHaptics: NSObject, WKScriptMessageHandler {
     }
 
     private func target() -> GCController? {
-        let all = GCController.controllers().filter { $0.haptics != nil }
-        return all.first(where: { $0.physicalInputProfile is GCDualSenseGamepad }) ?? all.first
+        // 듀얼센스에서만 동작합니다.
+        GCController.controllers().first(where: { $0.haptics != nil && $0.physicalInputProfile is GCDualSenseGamepad })
     }
 }

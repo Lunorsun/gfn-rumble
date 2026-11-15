@@ -53,7 +53,7 @@ final class GyroAim: NSObject {
 
     @objc private func tick() {
         let s = AppSettings.shared
-        guard let controller = GCController.controllers().first(where: { $0.motion?.hasRotationRate == true }),
+        guard let controller = GCController.controllers().first(where: { $0.motion?.hasRotationRate == true && $0.physicalInputProfile is GCDualSenseGamepad }),
               let motion = controller.motion else { return }
 
         // 켜지는 조건
