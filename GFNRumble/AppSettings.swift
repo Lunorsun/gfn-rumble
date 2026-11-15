@@ -1,22 +1,5 @@
 import Foundation
 
-/// 듀얼센스 방아쇠(L2/R2)에 넣을 흉내 효과.
-enum TriggerEffect: Int, CaseIterable {
-    case off = 0        // 끔
-    case weapon = 1     // 총 방아쇠: 중간에 '딸깍' 걸림
-    case vibration = 2  // 끝까지 당기면 '드르르' 떨림
-    case resistance = 3 // 당길 때 뻑뻑함
-
-    var title: String {
-        switch self {
-        case .off: return "끔"
-        case .weapon: return "총 방아쇠"
-        case .vibration: return "진동"
-        case .resistance: return "저항"
-        }
-    }
-}
-
 /// 16:9 게임 화면을 4:3 아이패드 화면에 맞추는 방법.
 enum VideoFit: Int, CaseIterable {
     case fit = 0      // 전체 보이기 (위아래 검은 띠)
@@ -67,20 +50,57 @@ final class AppSettings {
 
     // MARK: - 듀얼센스 방아쇠
 
-    var leftTriggerEffect: TriggerEffect {
-        get { TriggerEffect(rawValue: defaults.integer(forKey: key("leftTriggerEffect"))) ?? .off }
-        set { defaults.set(newValue.rawValue, forKey: key("leftTriggerEffect")); notify() }
+    /// L2 / R2 방아쇠 설정 (JSON으로 이 아이패드에만 저장)
+    var leftTrigger: TriggerConfig {
+        get { triggerConfig("leftTrigger") }
+        set { setTriggerConfig(newValue, "leftTrigger") }
     }
 
-    var rightTriggerEffect: TriggerEffect {
-        get { TriggerEffect(rawValue: defaults.integer(forKey: key("rightTriggerEffect"))) ?? .off }
-        set { defaults.set(newValue.rawValue, forKey: key("rightTriggerEffect")); notify() }
+    var rightTrigger: TriggerConfig {
+        get { triggerConfig("rightTrigger") }
+        set { setTriggerConfig(newValue, "rightTrigger") }
     }
 
-    /// 방아쇠 효과 세기 0.1 ~ 1.0 (기본 0.6)
-    var triggerStrength: Double {
-        get { double("triggerStrength", default: 0.6, range: 0.1...1.0) }
-        set { set(newValue, "triggerStrength", range: 0.1...1.0) }
+    /// 내 설정 저장 칸 (0, 1, 2). L2·R2를 함께 저장합니다.
+    func saveTriggerSlot(_ slot: Int) {
+        guard (0..<3).contains(slot) else { return }
+        defaults.set(encode(leftTrigger), forKey: key("slot\(slot).left"))
+        defaults.set(encode(rightTrigger), forKey: key("slot\(slot).right"))
+        notify()
+    }
+
+    /// 저장 칸을 불러옵니다. 비어 있으면 false.
+    @discardableResult
+    func loadTriggerSlot(_ slot: Int) -> Bool {
+        guard (0..<3).contains(slot),
+              let l = decode(defaults.data(forKey: key("slot\(slot).left"))),
+              let r = decode(defaults.data(forKey: key("slot\(slot).right"))) else { return false }
+        defaults.set(encode(l), forKey: key("leftTrigger"))
+        defaults.set(encode(r), forKey: key("rightTrigger"))
+        notify()
+        return true
+    }
+
+    func isTriggerSlotSaved(_ slot: Int) -> Bool {
+        defaults.data(forKey: key("slot\(slot).left")) != nil
+    }
+
+    private func triggerConfig(_ name: String) -> TriggerConfig {
+        decode(defaults.data(forKey: key(name))) ?? TriggerConfig()
+    }
+
+    private func setTriggerConfig(_ value: TriggerConfig, _ name: String) {
+        defaults.set(encode(value.clamped()), forKey: key(name))
+        notify()
+    }
+
+    private func encode(_ value: TriggerConfig) -> Data? {
+        try? JSONEncoder().encode(value.clamped())
+    }
+
+    private func decode(_ data: Data?) -> TriggerConfig? {
+        guard let data = data, let value = try? JSONDecoder().decode(TriggerConfig.self, from: data) else { return nil }
+        return value.clamped()
     }
 
     // MARK: - 화면

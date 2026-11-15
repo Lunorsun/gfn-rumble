@@ -240,6 +240,12 @@ final class RumbleManager {
               durationMs: durationMs, delayMs: 0)
     }
 
+    /// 방아쇠 햅틱용: 특정 컨트롤러 손잡이를 짧게 울립니다.
+    func kick(_ controller: GCController, strong: Double, weak: Double, durationMs: Double) {
+        drive(controller, strong: strong, weak: weak, leftTrigger: 0, rightTrigger: 0,
+              durationMs: durationMs, delayMs: 0)
+    }
+
     func controllerStatus() -> String {
         let all = GCController.controllers()
         if all.isEmpty { return "연결된 컨트롤러 없음" }

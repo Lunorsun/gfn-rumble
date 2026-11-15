@@ -66,18 +66,31 @@ final class SettingsViewController: UITableViewController {
                 }
             ]),
 
-            Section(title: "듀얼센스 방아쇠",
-                    footer: "게임과 상관없이 넣는 흉내 효과예요. 레이싱 게임 브레이크에도 똑같이 적용돼요. 듀얼센스만 지원해요.",
+            Section(title: "방아쇠 효과·햅틱",
+                    footer: "게임과 상관없이 직접 정한 효과예요. 방아쇠 자체 효과는 듀얼센스만, 손잡이 햅틱(단발·연사)은 진동되는 모든 컨트롤러에서 돼요. 저장 칸에 게임별 설정을 넣어 두고 바꿔 끼세요.",
                     rows: [
-                        .segmented(title: "L2", items: TriggerEffect.allCases.map { $0.title },
-                                   get: { s.leftTriggerEffect.rawValue },
-                                   set: { s.leftTriggerEffect = TriggerEffect(rawValue: $0) ?? .off }),
-                        .segmented(title: "R2", items: TriggerEffect.allCases.map { $0.title },
-                                   get: { s.rightTriggerEffect.rawValue },
-                                   set: { s.rightTriggerEffect = TriggerEffect(rawValue: $0) ?? .off }),
-                        .slider(title: "효과 세기", range: 0.1...1.0, format: Self.percent,
-                                get: { s.triggerStrength }, set: { s.triggerStrength = $0 })
-                    ]),
+                        .action(title: "L2 상세 설정 — " + s.leftTrigger.mode.title) { [weak self] in
+                            self?.navigationController?.pushViewController(TriggerDetailViewController(left: true), animated: true)
+                        },
+                        .action(title: "R2 상세 설정 — " + s.rightTrigger.mode.title) { [weak self] in
+                            self?.navigationController?.pushViewController(TriggerDetailViewController(left: false), animated: true)
+                        }
+                    ] + (0..<3).flatMap { slot -> [Row] in
+                        [
+                            .action(title: "저장 칸 \(slot + 1)에 지금 설정 저장") { [weak self] in
+                                s.saveTriggerSlot(slot)
+                                self?.alert("저장했어요", "저장 칸 \(slot + 1)에 L2·R2 설정을 저장했어요.")
+                            },
+                            .action(title: "저장 칸 \(slot + 1) 불러오기" + (s.isTriggerSlotSaved(slot) ? "" : " (비어 있음)")) { [weak self] in
+                                if s.loadTriggerSlot(slot) {
+                                    self?.buildSections()
+                                    self?.tableView.reloadData()
+                                } else {
+                                    self?.alert("비어 있어요", "먼저 저장 칸 \(slot + 1)에 설정을 저장해 주세요.")
+                                }
+                            }
+                        ]
+                    }),
 
             Section(title: "화면", footer: "16:9 게임 화면을 4:3 아이패드에 어떻게 맞출지 골라요.", rows: [
                 .segmented(title: "화면 맞춤", items: VideoFit.allCases.map { $0.title },
