@@ -17,6 +17,9 @@ targets:
       properties:
         # 영문만 씁니다. SideStore가 이 이름으로 Apple에 앱을 등록하는데, 한글은 거부됩니다.
         CFBundleDisplayName: GFN Rumble
+        # 빌드 번호는 GitHub 빌드가 넣어 줍니다 (SideStore 업데이트가 이 번호로 확인)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
         UILaunchScreen:
           UIImageRespectsSafeAreaInsets: false
         UIRequiresFullScreen: true

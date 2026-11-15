@@ -58,6 +58,8 @@ jobs:
           test -d "$APP"
           test -f "$APP/rumble-bridge.js"
           test -f "$APP/GFNRumble"   # 실행 파일이 없으면 실패
+          # 빌드 번호가 제대로 들어갔는지 확인 (SideStore 업데이트용)
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")" = "${{ github.run_number }}"
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qr GFNRumble.ipa Payload
