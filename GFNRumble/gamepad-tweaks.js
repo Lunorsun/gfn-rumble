@@ -9,12 +9,13 @@
     if (!navigator.getGamepads) return;
     var original = navigator.getGamepads.bind(navigator);
     var cfg = { deadzone: 0, curve: 1, invertY: false, swapAB: false, gyro: false };
-    var gyroX = 0, gyroY = 0;
+    var gyroX = 0, gyroY = 0, gyroTime = 0;
     // 앱이 자이로 값을 넣어 줍니다 (오른쪽 스틱에 더함)
     window.__gfnGyro = {
       set: function (x, y) {
         gyroX = isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
         gyroY = isFinite(y) ? Math.max(-1, Math.min(1, y)) : 0;
+        gyroTime = performance.now();
       }
     };
     var active = false;
@@ -71,6 +72,8 @@
       if (a.length >= 4) {
         stick(a[2], a[3], w.axes, 2);
         if (cfg.invertY) w.axes[3] = -w.axes[3];
+        // 앱이 0.15초 넘게 새 값을 안 보내면 자이로는 0으로 봅니다 (값이 남아 계속 도는 것 방지)
+        if (cfg.gyro && pad.index === 0 && (gyroX || gyroY) && performance.now() - gyroTime > 150) { gyroX = 0; gyroY = 0; }
         if (cfg.gyro && pad.index === 0) {
           w.axes[2] = Math.max(-1, Math.min(1, w.axes[2] + gyroX));
           w.axes[3] = Math.max(-1, Math.min(1, w.axes[3] + gyroY));

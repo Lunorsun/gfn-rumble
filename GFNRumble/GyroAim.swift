@@ -49,13 +49,17 @@ final class GyroAim: NSObject {
         link = nil
         x = 0
         y = 0
-        send(0, 0)
+        send(0, 0, force: true)
     }
 
     @objc private func tick() {
         let s = AppSettings.shared
         guard let controller = GCController.controllers().first(where: { $0.motion?.hasRotationRate == true && $0.physicalInputProfile is GCDualSenseGamepad }),
-              let motion = controller.motion else { return }
+              let motion = controller.motion else {
+            x = 0; y = 0
+            if !lastSentZero { send(0, 0, force: true) }
+            return
+        }
 
         // 켜지는 조건
         var on = true
@@ -75,21 +79,32 @@ final class GyroAim: NSObject {
             if abs(targetX) < 0.02 { targetX = 0 }
             if abs(targetY) < 0.02 { targetY = 0 }
         }
-        // 떨림 줄이기 (부드럽게)
-        let k = 1 - s.gyroSmoothing
-        x += (targetX - x) * k
-        y += (targetY - y) * k
+        // 떨림 줄이기 (부드럽게). 조준 버튼을 놓으면 바로 0으로 (남은 값 때문에 계속 도는 것 방지)
+        if on {
+            let k = 1 - s.gyroSmoothing
+            x += (targetX - x) * k
+            y += (targetY - y) * k
+        } else {
+            x = 0
+            y = 0
+        }
         x = min(1, max(-1, x))
         y = min(1, max(-1, y))
         send(x, y)
     }
 
-    private func send(_ x: Double, _ y: Double) {
+    private var lastSendTime: CFTimeInterval = 0
+
+    private func send(_ x: Double, _ y: Double, force: Bool = false) {
         let zero = abs(x) < 0.001 && abs(y) < 0.001
-        if zero && lastSentZero { return }
+        if zero && lastSentZero && !force { return }
+        let now = CACurrentMediaTime()
+        // 0이 아니면 최소 0.08초마다 다시 보내 웹페이지 쪽 값이 만료되지 않게 합니다.
+        let stale = now - lastSendTime > 0.08
         // 거의 안 바뀌었으면 보내지 않아 게임 화면의 부담을 줄입니다.
-        if !zero && !lastSentZero && abs(x - lastSent.x) < 0.004 && abs(y - lastSent.y) < 0.004 { return }
-        guard !inFlight, let webView = webView() else { return }
+        if !force && !stale && !zero && !lastSentZero && abs(x - lastSent.x) < 0.004 && abs(y - lastSent.y) < 0.004 { return }
+        guard (!inFlight || force), let webView = webView() else { return }
+        lastSendTime = now
         lastSentZero = zero
         lastSent = (x, y)
         inFlight = true
