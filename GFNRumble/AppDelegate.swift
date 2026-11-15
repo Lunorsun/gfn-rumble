@@ -7,12 +7,20 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // 게임 중 화면이 꺼지지 않게
         application.isIdleTimerDisabled = true
+        // 서명 만료 알림 (알림 권한을 처음 한 번 물어봅니다)
+        ExpiryMonitor.shared.start()
         return true
     }
 
     func application(_ application: UIApplication,
                      configurationForConnecting connectingSceneSession: UISceneSession,
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        if #available(iOS 16.0, *), connectingSceneSession.role == .windowExternalDisplayNonInteractive {
+            // TV 모드(실험): 외부 화면
+            let configuration = UISceneConfiguration(name: "External", sessionRole: connectingSceneSession.role)
+            configuration.delegateClass = ExternalDisplaySceneDelegate.self
+            return configuration
+        }
         let configuration = UISceneConfiguration(name: "Default", sessionRole: connectingSceneSession.role)
         configuration.delegateClass = SceneDelegate.self
         return configuration

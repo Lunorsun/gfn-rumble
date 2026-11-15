@@ -10,9 +10,17 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # 빌드 환경 고정: iOS 26 SDK (iOS 27 SDK는 전체 화면 동작이 바뀌어서 아직 안 씀)
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+
+      # 보안 벽: 금지된 코드(인터넷 직접 접속, 로그, 클립보드, 위장 등)가 있으면 여기서 멈춤
+      - name: Security check
+        run: bash scripts/security-check.sh
 
       - name: Install XcodeGen
         run: brew install xcodegen

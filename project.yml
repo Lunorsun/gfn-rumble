@@ -33,6 +33,10 @@ targets:
             UIWindowSceneSessionRoleApplication:
               - UISceneConfigurationName: Default
                 UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+            # TV 모드(실험): 외부 화면 장면
+            UIWindowSceneSessionRoleExternalDisplayNonInteractive:
+              - UISceneConfigurationName: External
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).ExternalDisplaySceneDelegate
         NSMicrophoneUsageDescription: 지포스 나우에서 음성 채팅을 켰을 때만 마이크를 사용합니다.
         ITSAppUsesNonExemptEncryption: false
     settings:

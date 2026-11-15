@@ -17,12 +17,18 @@ final class WebViewController: UIViewController {
     private var bridgeInstalled = false
     private var pageCheckedRumble = false
 
+    // 실험 기능
+    private let mouseModeOn = AppSettings.shared.mouseModeEnabled   // 앱을 다시 켜야 바뀜
+    private var mouseInput: MouseInput?
+    private let tvLabel = UILabel()
+
     // MARK: - 화면 설정
 
     override var prefersStatusBarHidden: Bool { true }
     override var prefersHomeIndicatorAutoHidden: Bool { true }
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscape }
+    override var prefersPointerLocked: Bool { mouseInput?.isLocked ?? false }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -30,7 +36,34 @@ final class WebViewController: UIViewController {
         _ = RumbleManager.shared   // 컨트롤러 감시 시작
         setUpWebView()
         setUpButtons()
+        setUpTVLabel()
+        WarningCenter.shared.attach(to: view)
+        WarningCenter.shared.start()
+        TriggerEffects.shared.start()
+        ExternalDisplayCoordinator.shared.host = self
+
+        if mouseModeOn {
+            let input = MouseInput(viewController: self) { [weak self] in self?.webView }
+            input.start()
+            mouseInput = input
+            webView.configuration.userContentController.add(input, name: MouseInput.handlerName)
+            let unlock = UITapGestureRecognizer(target: self, action: #selector(unlockMouse))
+            unlock.numberOfTouchesRequired = 3
+            view.addGestureRecognizer(unlock)
+        }
+
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(settingsChanged),
+                           name: AppSettings.didChange, object: nil)
+        center.addObserver(self, selector: #selector(appBecameActive),
+                           name: UIApplication.didBecomeActiveNotification, object: nil)
+
         webView.load(URLRequest(url: Self.homeURL))
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        appBecameActive()
     }
 
     private func setUpWebView() {
@@ -41,17 +74,28 @@ final class WebViewController: UIViewController {
         configuration.defaultWebpagePreferences.preferredContentMode = .desktop
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         if #available(iOS 15.4, *) {
-            configuration.preferences.isElementFullscreenEnabled = true
+            // 마우스 모드에서는 전체 화면 기능이 마우스 고정을 깨뜨려서 끕니다.
+            configuration.preferences.isElementFullscreenEnabled = !mouseModeOn
         }
 
         let contentController = WKUserContentController()
         contentController.add(self, name: "rumble")
-        if let url = Bundle.main.url(forResource: "rumble-bridge", withExtension: "js"),
-           let source = try? String(contentsOf: url, encoding: .utf8) {
+        contentController.add(SessionAlerts.shared, name: SessionAlerts.handlerName)
+        contentController.add(QualityAlerts.shared, name: QualityAlerts.handlerName)
+
+        // 설정 전달 통로를 가장 먼저 넣습니다.
+        contentController.addUserScript(WKUserScript(source: Self.configHubScript(),
+                                                     injectionTime: .atDocumentStart,
+                                                     forMainFrameOnly: false))
+        var scripts = ["rumble-bridge", "gamepad-tweaks", "video-fit", "session-watch", "resolution-2k"]
+        if mouseModeOn { scripts.append("pointer-lock") }
+        for name in scripts {
+            guard let url = Bundle.main.url(forResource: name, withExtension: "js"),
+                  let source = try? String(contentsOf: url, encoding: .utf8) else { continue }
             contentController.addUserScript(WKUserScript(source: source,
                                                          injectionTime: .atDocumentStart,
                                                          forMainFrameOnly: false))
-            bridgeScriptLoaded = true
+            if name == "rumble-bridge" { bridgeScriptLoaded = true }
         }
         configuration.userContentController = contentController
 
@@ -92,6 +136,56 @@ final class WebViewController: UIViewController {
         view.addSubview(popupCloseButton)
     }
 
+    private func setUpTVLabel() {
+        tvLabel.text = "TV에 게임을 보여 주는 중이에요\n설정에서 TV 모드를 끄면 아이패드로 돌아와요"
+        tvLabel.numberOfLines = 0
+        tvLabel.textAlignment = .center
+        tvLabel.textColor = .white
+        tvLabel.font = .systemFont(ofSize: 20, weight: .semibold)
+        tvLabel.frame = view.bounds
+        tvLabel.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        tvLabel.isHidden = true
+        view.insertSubview(tvLabel, at: 0)
+    }
+
+    /// 웹페이지에 설정을 넘기는 통로 (설정 값만, 개인정보 없음)
+    private static func configHubScript() -> String {
+        """
+        (function () {
+          if (window.__gfnApplyConfig) return;
+          window.__gfnConfig = \(AppSettings.shared.jsConfigJSON());
+          window.__gfnConfigListeners = window.__gfnConfigListeners || [];
+          window.__gfnApplyConfig = function (c) {
+            window.__gfnConfig = c;
+            window.__gfnConfigListeners.forEach(function (f) { try { f(c); } catch (e) {} });
+          };
+        })();
+        """
+    }
+
+    @objc private func settingsChanged() {
+        let script = "window.__gfnApplyConfig&&window.__gfnApplyConfig(\(AppSettings.shared.jsConfigJSON()))"
+        webView.evaluateJavaScript(script, completionHandler: nil)
+        popup?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    @objc private func appBecameActive() {
+        ExpiryMonitor.shared.refresh()
+        if let text = ExpiryMonitor.shared.bannerText() {
+            WarningCenter.shared.show(text)
+        }
+    }
+
+    @objc private func unlockMouse() {
+        mouseInput?.unlock()
+    }
+
+    @objc private func openSettings() {
+        let navigation = UINavigationController(rootViewController: SettingsViewController())
+        navigation.modalPresentationStyle = .formSheet
+        present(navigation, animated: true)
+    }
+
     /// 아이패드 Safari가 보내는 것과 같은 브라우저 정보
     private static func safariUserAgent() -> String {
         let version = ProcessInfo.processInfo.operatingSystemVersion
@@ -102,8 +196,13 @@ final class WebViewController: UIViewController {
     // MARK: - 메뉴
 
     @objc private func showMenu() {
-        let sheet = UIAlertController(title: "GFN 진동", message: nil, preferredStyle: .actionSheet)
+        let sheet = UIAlertController(title: "GFN Rumble",
+                                      message: "서명: " + ExpiryMonitor.shared.statusText(),
+                                      preferredStyle: .actionSheet)
 
+        sheet.addAction(UIAlertAction(title: "설정", style: .default) { [weak self] _ in
+            self?.openSettings()
+        })
         sheet.addAction(UIAlertAction(title: "진동 테스트 1: 컨트롤러 직접", style: .default) { [weak self] _ in
             if !RumbleManager.shared.runTest() {
                 self?.showInfo("진동 가능한 컨트롤러가 없어요",
@@ -192,6 +291,32 @@ final class WebViewController: UIViewController {
         popup?.removeFromSuperview()
         popup = nil
         popupCloseButton.isHidden = true
+        // 웹킷은 '선택된' 웹뷰에만 컨트롤러 입력을 줘서, 로그인 창을 닫은 뒤 다시 선택합니다.
+        webView.becomeFirstResponder()
+    }
+}
+
+// MARK: - TV 모드 (실험)
+
+extension WebViewController: ExternalDisplayHost {
+
+    func externalDisplayDidConnect(_ container: UIView) {
+        closePopup()
+        webView.removeFromSuperview()
+        webView.frame = container.bounds
+        container.addSubview(webView)
+        WarningCenter.shared.attach(to: container)
+        tvLabel.isHidden = false
+        DispatchQueue.main.async { [weak self] in self?.webView.becomeFirstResponder() }
+    }
+
+    func externalDisplayDidDisconnect() {
+        webView.removeFromSuperview()
+        webView.frame = view.bounds
+        view.insertSubview(webView, aboveSubview: tvLabel)
+        WarningCenter.shared.attach(to: view)
+        tvLabel.isHidden = true
+        DispatchQueue.main.async { [weak self] in self?.webView.becomeFirstResponder() }
     }
 }
 

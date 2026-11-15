@@ -233,6 +233,13 @@ final class RumbleManager {
         return true
     }
 
+    /// 알림용 짧은 진동 (대기열 끝 등). 현재 컨트롤러를 울립니다.
+    func pulse(strong: Double, weak: Double, durationMs: Double) {
+        guard let controller = controller(webIndex: 0, id: nil) else { return }
+        drive(controller, strong: strong, weak: weak, leftTrigger: 0, rightTrigger: 0,
+              durationMs: durationMs, delayMs: 0)
+    }
+
     func controllerStatus() -> String {
         let all = GCController.controllers()
         if all.isEmpty { return "연결된 컨트롤러 없음" }
@@ -265,9 +272,18 @@ final class RumbleManager {
         let duration = min(max(durationMs, 0), 5000) / 1000
         let delay = min(max(delayMs, 0), 5000) / 1000
 
+        // 설정의 진동 세기·최소 세기를 적용합니다.
+        let settings = AppSettings.shared
+        let gain = settings.rumbleGain
+        let minimum = settings.rumbleMinimum
+        func scaled(_ value: Double) -> Float {
+            guard value > 0.005, gain > 0 else { return 0 }
+            return Float(min(1, max(minimum, value * gain)))
+        }
+        let s = scaled(strong), w = scaled(weak), lt = scaled(leftTrigger), rt = scaled(rightTrigger)
+
         let start = DispatchWorkItem { [weak rig] in
-            rig?.apply(strong: Float(strong), weak: Float(weak),
-                       leftTrigger: Float(leftTrigger), rightTrigger: Float(rightTrigger))
+            rig?.apply(strong: s, weak: w, leftTrigger: lt, rightTrigger: rt)
         }
         if delay > 0 {
             rig.pendingStart = start
