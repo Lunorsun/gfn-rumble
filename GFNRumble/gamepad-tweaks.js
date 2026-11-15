@@ -18,7 +18,6 @@
       }
     };
     var active = false;
-    var wrappers = {};
 
     function num(v, d, lo, hi) {
       v = Number(v);
@@ -47,24 +46,27 @@
       out[i + 1] = (y / mag) * m;
     }
 
+    // 매번 '새' 스냅샷을 만듭니다. 같은 객체를 재사용하면 게임이 이전 프레임과
+    // 지금 프레임을 비교하지 못해 버튼이 계속 눌린 것처럼 보일 수 있어요.
+    function snapshotButton(btn) {
+      return { pressed: !!btn.pressed, touched: !!btn.touched, value: Number(btn.value) || 0 };
+    }
+
     function wrap(pad) {
-      var w = wrappers[pad.index];
-      if (!w) {
-        w = { axes: [], buttons: [], _pad: pad };
-        Object.defineProperty(w, 'vibrationActuator', { get: function () { return w._pad.vibrationActuator; } });
-        Object.defineProperty(w, 'hapticActuators', { get: function () { return w._pad.hapticActuators; } });
-        wrappers[pad.index] = w;
-      }
-      w._pad = pad;
-      w.id = pad.id;
-      w.index = pad.index;
-      w.connected = pad.connected;
-      w.mapping = pad.mapping;
-      w.timestamp = pad.timestamp;
+      var w = {
+        id: pad.id,
+        index: pad.index,
+        connected: pad.connected,
+        mapping: pad.mapping,
+        timestamp: pad.timestamp,
+        axes: [],
+        buttons: []
+      };
+      Object.defineProperty(w, 'vibrationActuator', { get: function () { return pad.vibrationActuator; } });
+      Object.defineProperty(w, 'hapticActuators', { get: function () { return pad.hapticActuators; } });
 
       var a = pad.axes;
-      w.axes.length = a.length;
-      for (var i = 0; i < a.length; i++) w.axes[i] = a[i];
+      for (var i = 0; i < a.length; i++) w.axes.push(a[i]);
       if (a.length >= 2) stick(a[0], a[1], w.axes, 0);
       if (a.length >= 4) {
         stick(a[2], a[3], w.axes, 2);
@@ -78,23 +80,21 @@
       }
 
       var b = pad.buttons;
-      w.buttons.length = b.length;
-      for (var j = 0; j < b.length; j++) w.buttons[j] = b[j];
+      for (var j = 0; j < b.length; j++) w.buttons.push(snapshotButton(b[j]));
       if (cfg.swapAB && b.length >= 4) {
-        w.buttons[0] = b[1]; w.buttons[1] = b[0];
-        w.buttons[2] = b[3]; w.buttons[3] = b[2];
+        var t0 = w.buttons[0], t2 = w.buttons[2];
+        w.buttons[0] = w.buttons[1]; w.buttons[1] = t0;
+        w.buttons[2] = w.buttons[3]; w.buttons[3] = t2;
       }
       return w;
     }
-
-    var result = [];
     navigator.getGamepads = function () {
       var pads = original();
       if (!active || !pads) return pads;
-      result.length = pads.length;
+      var result = [];
       for (var i = 0; i < pads.length; i++) {
         var p = pads[i];
-        result[i] = p ? wrap(p) : null;
+        result.push(p ? wrap(p) : null);
       }
       return result;
     };

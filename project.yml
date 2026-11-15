@@ -18,6 +18,10 @@ targets:
         # 영문만 씁니다. SideStore가 이 이름으로 Apple에 앱을 등록하는데, 한글은 거부됩니다.
         CFBundleDisplayName: GFN Rumble
         # 빌드 번호는 GitHub 빌드가 넣어 줍니다 (SideStore 업데이트가 이 번호로 확인)
+        # 아이패드 게임 모드: 블루투스 컨트롤러를 더 자주 읽어 입력 지연·씹힘을 줄입니다.
+        LSApplicationCategoryType: public.app-category.games
+        GCSupportsGameMode: true
+        LSSupportsGameMode: true
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         UILaunchScreen:
