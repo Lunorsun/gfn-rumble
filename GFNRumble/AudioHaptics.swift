@@ -19,6 +19,7 @@ final class AudioHaptics: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
+        guard MessageOrigin.isTrusted(message) else { return }
         let s = AppSettings.shared
         frameCount += 1
         guard s.audioHapticsEnabled,

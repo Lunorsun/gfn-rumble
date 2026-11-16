@@ -105,7 +105,7 @@ final class WebViewController: UIViewController {
 
         let webView = WKWebView(frame: view.bounds, configuration: configuration)
         webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        webView.customUserAgent = Self.safariUserAgent()
+        webView.customUserAgent = BrowserIdentity.userAgent()
         webView.uiDelegate = self
         webView.navigationDelegate = self
         webView.allowsBackForwardNavigationGestures = false
@@ -179,6 +179,9 @@ final class WebViewController: UIViewController {
         if let text = ExpiryMonitor.shared.bannerText() {
             WarningCenter.shared.show(text)
         }
+        UpdateCheck.shared.checkIfDue { text in
+            WarningCenter.shared.show(text, duration: 8)
+        }
     }
 
     @objc private func unlockMouse() {
@@ -204,13 +207,6 @@ final class WebViewController: UIViewController {
                 self.activeWebView.becomeFirstResponder()
             }
         }
-    }
-
-    /// 아이패드 Safari가 보내는 것과 같은 브라우저 정보
-    private static func safariUserAgent() -> String {
-        let version = ProcessInfo.processInfo.operatingSystemVersion
-        return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) "
-            + "Version/\(version.majorVersion).\(version.minorVersion) Safari/605.1.15"
     }
 
     // MARK: - 메뉴
@@ -292,7 +288,8 @@ final class WebViewController: UIViewController {
         let manager = RumbleManager.shared
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
         let lines = [
-            "앱 버전: build-\(build)",
+            "앱 버전: build-\(build) · 새 버전 확인: \(UpdateCheck.shared.lastResult)",
+            "브라우저 표시: \(BrowserIdentity.currentName) · 막은 외부 메시지: \(MessageOrigin.rejectedCount)회",
             "진동 스위치: " + (AppSettings.shared.rumbleEnabled ? "켜짐" : "꺼짐")
                 + " · 게임 진동 " + (AppSettings.shared.gameRumbleEnabled ? "켜짐" : "꺼짐"),
             "브리지 파일: " + (bridgeScriptLoaded ? "있음" : "없음 (빌드 문제)"),
@@ -365,7 +362,8 @@ extension WebViewController: WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any],
+        guard MessageOrigin.isTrusted(message),
+              let body = message.body as? [String: Any],
               let type = body["type"] as? String else { return }
 
         func number(_ key: String) -> Double {

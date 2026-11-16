@@ -49,7 +49,8 @@ final class MouseInput: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
-        guard let text = message.body as? String else { return }
+        guard MessageOrigin.isTrusted(message),
+              let text = message.body as? String else { return }
         if text == "lock" { setLocked(true) }
         if text == "unlock" { setLocked(false) }
     }

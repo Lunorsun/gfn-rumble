@@ -11,7 +11,8 @@ final class SessionAlerts: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any],
+        guard MessageOrigin.isTrusted(message),
+              let body = message.body as? [String: Any],
               let type = body["type"] as? String,
               AppSettings.shared.sessionAlertsEnabled else { return }
 
@@ -53,7 +54,8 @@ final class QualityAlerts: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any],
+        guard MessageOrigin.isTrusted(message),
+              let body = message.body as? [String: Any],
               let type = body["type"] as? String else { return }
         let settings = AppSettings.shared
         let warnings = WarningCenter.shared

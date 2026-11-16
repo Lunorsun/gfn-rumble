@@ -351,8 +351,29 @@ final class SettingsViewController: UITableViewController {
                 .link(title: "실험 기능", detail: { "" }, warn: true, make: { [unowned self] in self.labScreen() })
             ]),
 
+            Section(title: "백업·업데이트", footer: "백업 파일에는 이 앱 설정만 들어가요. 계정·개인정보는 없어요.", rows: [
+                .action(title: "설정 백업 (파일로 내보내기)") { [weak self] in
+                    guard let self = self else { return }
+                    SettingsBackup.shared.export(from: self)
+                },
+                .action(title: "설정 복원 (파일 가져오기)") { [weak self] in
+                    guard let self = self else { return }
+                    SettingsBackup.shared.importFile(from: self) { [weak self] text in
+                        self?.alert("설정 복원", text)
+                        self?.tableView.reloadData()
+                    }
+                },
+                .toggle(title: "새 버전 알림 (하루 한 번 확인)", get: { UpdateCheck.shared.enabled },
+                        set: { UpdateCheck.shared.enabled = $0 }, confirmOn: nil),
+                .action(title: "지금 새 버전 확인") { [weak self] in
+                    UpdateCheck.shared.checkIfDue(force: true) { text in
+                        self?.alert("새 버전 확인", text)
+                    }
+                }
+            ]),
+
             Section(title: "정보", footer: nil, rows: [
-                .info("설정은 이 아이패드에만 저장돼요. 이 앱은 지포스 나우 외의 인터넷 주소에 접속하지 않고, 개인정보를 모으거나 보내지 않아요.")
+                .info("설정은 이 아이패드에만 저장돼요. 이 앱은 지포스 나우와, 새 버전 확인용 GitHub 공개 파일 하나 외의 인터넷 주소에 접속하지 않고, 개인정보를 모으거나 보내지 않아요.")
             ])
         ]
     }
@@ -610,6 +631,11 @@ final class SettingsViewController: UITableViewController {
                     .toggle(title: "TV 모드 (HDMI·AirPlay)", get: { s.tvModeEnabled },
                             set: { s.tvModeEnabled = $0 }, confirmOn: nil),
                     .info("TV를 연결하면 게임을 TV에 꽉 채워 보여 줘요(최대 1080p). AirPlay는 지연이 있어요."),
+                    .toggle(title: "브라우저 표시: Chrome으로 보이기", get: { BrowserIdentity.chromeEnabled },
+                            set: { BrowserIdentity.chromeEnabled = $0 },
+                            confirmOn: (title: "Chrome으로 보이기 (실험)",
+                                        message: "지포스 나우가 진동을 보내는지 시험하는 기능이에요. 브라우저 이름표만 바꾸며, NVIDIA 약관상 '클라이언트 수정'으로 볼 수 있어요. 일부 기능이 오류 날 수 있어요. 앱을 완전히 껐다 켜야 적용돼요.")),
+                    .info("지금: \(BrowserIdentity.currentName). 이상하면 끄고 앱을 다시 켜 주세요."),
                     .toggle(title: "A↔B · X↔Y 바꾸기", get: { s.swapFaceButtons },
                             set: { s.swapFaceButtons = $0 }, confirmOn: nil),
                     .toggle(title: "오른쪽 스틱 상하 반전", get: { s.invertRightStickY },
