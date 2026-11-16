@@ -12,6 +12,9 @@ private final class Motor {
     private var player: CHHapticPatternPlayer?
     private var isPlaying = false
 
+    /// 진단용: 마지막으로 난 오류 (상태 보기에 표시)
+    static var lastError = "없음"
+
     init(controller: GCController, locality: GCHapticsLocality) {
         self.controller = controller
         self.locality = locality
@@ -40,9 +43,8 @@ private final class Motor {
             if player == nil {
                 // 기본 세기는 1.0으로 두고, 실제 세기는 아래 동적 파라미터로 곱해집니다.
                 let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
-                let baseSharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
                 let event = CHHapticEvent(eventType: .hapticContinuous,
-                                          parameters: [intensity, baseSharpness],
+                                          parameters: [intensity],
                                           relativeTime: 0,
                                           duration: TimeInterval(GCHapticDurationInfinite))
                 let pattern = try CHHapticPattern(events: [event], parameters: [])
@@ -53,17 +55,22 @@ private final class Motor {
             let control = CHHapticDynamicParameter(parameterID: .hapticIntensityControl,
                                                    value: value,
                                                    relativeTime: 0)
-            // 날카로움은 기본값(0.5)에 더해지는 값이라 -0.5 ~ +0.5로 보냅니다.
-            let sharp = CHHapticDynamicParameter(parameterID: .hapticSharpnessControl,
-                                                 value: max(0, min(1, sharpness)) - 0.5,
-                                                 relativeTime: 0)
-            try player.sendParameters([control, sharp], atTime: CHHapticTimeImmediate)
+            // 세기는 반드시 먼저, 단독으로 보냅니다 (날카로움 때문에 진동 전체가 막히지 않게).
+            try player.sendParameters([control], atTime: CHHapticTimeImmediate)
             if !isPlaying {
                 try player.start(atTime: CHHapticTimeImmediate)
                 isPlaying = true
-                try player.sendParameters([control, sharp], atTime: CHHapticTimeImmediate)
+                try player.sendParameters([control], atTime: CHHapticTimeImmediate)
+            }
+            // 날카로움은 기본에서 많이 벗어날 때만, 실패해도 무시합니다.
+            if abs(sharpness - 0.5) > 0.02 {
+                let sharp = CHHapticDynamicParameter(parameterID: .hapticSharpnessControl,
+                                                     value: max(0, min(1, sharpness)) - 0.5,
+                                                     relativeTime: 0)
+                try? player.sendParameters([sharp], atTime: CHHapticTimeImmediate)
             }
         } catch {
+            Motor.lastError = "\(locality.rawValue): \(error.localizedDescription)"
             invalidate()
         }
     }
@@ -97,7 +104,10 @@ private final class Motor {
     }
 
     private func makeEngine() -> CHHapticEngine? {
-        guard let engine = controller?.haptics?.createEngine(withLocality: locality) else { return nil }
+        guard let engine = controller?.haptics?.createEngine(withLocality: locality) else {
+            Motor.lastError = "\(locality.rawValue): 엔진을 만들지 못함"
+            return nil
+        }
 
         // 엔진이 멈추거나 초기화되면 버리고, 다음 진동 때 새로 만듭니다.
         engine.stoppedHandler = { [weak self, weak engine] _ in
@@ -116,6 +126,7 @@ private final class Motor {
         do {
             try engine.start()
         } catch {
+            Motor.lastError = "\(locality.rawValue): 엔진 시작 실패 \(error.localizedDescription)"
             return nil
         }
         return engine
@@ -236,6 +247,9 @@ final class RumbleManager {
     /// 진단용: 웹에서 받은 진동 명령 수와 마지막 명령
     private(set) var webCommandCount = 0
     private(set) var lastWebCommand = "없음"
+    private(set) var nonZeroWebCommands = 0
+    private(set) var peakWebCommand = 0.0
+    var lastError: String { Motor.lastError }
 
     private init() {
         let center = NotificationCenter.default
@@ -262,6 +276,10 @@ final class RumbleManager {
                        leftTrigger: Double, rightTrigger: Double,
                        durationMs: Double, delayMs: Double) {
         webCommandCount += 1
+        if max(strong, weak, leftTrigger, rightTrigger) > 0.005 {
+            nonZeroWebCommands += 1
+            peakWebCommand = max(peakWebCommand, strong, weak, leftTrigger, rightTrigger)
+        }
         lastWebCommand = String(format: "강 %.2f / 약 %.2f / %.0fms", strong, weak, durationMs)
         // '게임 소리 → 햅틱'만 쓰도록 설정했으면 게임 진동은 무시합니다.
         let settings = AppSettings.shared

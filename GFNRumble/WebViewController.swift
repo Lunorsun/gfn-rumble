@@ -293,6 +293,8 @@ final class WebViewController: UIViewController {
             "지포스 나우가 진동 기능을 확인함: " + (pageCheckedRumble ? "예" : "아직 아니오"),
             "웹에서 받은 진동 명령: \(manager.webCommandCount)회",
             "마지막 명령: \(manager.lastWebCommand)",
+            "0이 아닌 명령: \(manager.nonZeroWebCommands)회 · 최대 세기 \(String(format: "%.2f", manager.peakWebCommand))",
+            "마지막 진동 오류: \(manager.lastError)",
             "소리 햅틱: " + (AppSettings.shared.audioHapticsEnabled ? "켜짐" : "꺼짐") + " · 받은 값 \(AudioHaptics.shared.frameCount)회 · 마지막 \(AudioHaptics.shared.lastText)",
             "게임 진동도 같이: " + (AppSettings.shared.audioHapticsWithRumble ? "예" : "아니오"),
             "",
