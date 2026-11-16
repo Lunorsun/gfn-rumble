@@ -86,10 +86,10 @@ final class AppSettings {
         set { set(newValue, "triggerMotorGain", range: 0.0...1.5) }
     }
 
-    /// 세기 상한 0.2 ~ 1.0 (기본 1.0). 아무리 세게 와도 이 세기를 넘지 않게 합니다.
+    /// 세기 상한 0.05 ~ 1.0 (기본 1.0). 아무리 세게 와도 이 세기를 넘지 않게 합니다.
     var rumbleCeiling: Double {
-        get { double("rumbleCeiling", default: 1.0, range: 0.2...1.0) }
-        set { set(newValue, "rumbleCeiling", range: 0.2...1.0) }
+        get { double("rumbleCeiling", default: 1.0, range: 0.05...1.0) }
+        set { set(newValue, "rumbleCeiling", range: 0.05...1.0) }
     }
 
     /// 작은 진동 무시 0.0 ~ 0.5 (기본 0). 이보다 약한 진동은 울리지 않습니다.
@@ -144,13 +144,13 @@ final class AppSettings {
     // 작은 진동 무시는 둘 중 큰 값, 반응 곡선은 둘을 곱한 값, 세기 상한은 둘 중 작은 값을 씁니다.
 
     var leftCeiling: Double {
-        get { double("leftCeiling", default: 1.0, range: 0.2...1.0) }
-        set { set(newValue, "leftCeiling", range: 0.2...1.0) }
+        get { double("leftCeiling", default: 1.0, range: 0.05...1.0) }
+        set { set(newValue, "leftCeiling", range: 0.05...1.0) }
     }
 
     var rightCeiling: Double {
-        get { double("rightCeiling", default: 1.0, range: 0.2...1.0) }
-        set { set(newValue, "rightCeiling", range: 0.2...1.0) }
+        get { double("rightCeiling", default: 1.0, range: 0.05...1.0) }
+        set { set(newValue, "rightCeiling", range: 0.05...1.0) }
     }
 
     var leftCurve: Double {
@@ -181,7 +181,18 @@ final class AppSettings {
         "rumbleWidth", "leftCeiling", "rightCeiling", "leftCurve", "rightCurve", "leftDeadzone", "rightDeadzone"
     ]
 
-    /// 진동 세부 설정을 모두 기본값으로 되돌립니다. (켜기/끄기 스위치는 그대로)
+    /// 설정 이름들을 기본값으로 되돌립니다. (설정 화면의 ↺ 버튼용)
+    func resetKeys(_ names: [String]) {
+        for name in names { defaults.removeObject(forKey: key(name)) }
+        notify()
+    }
+
+    /// 기본값에서 바뀐 설정인지
+    func isCustom(_ name: String) -> Bool {
+        defaults.object(forKey: key(name)) != nil
+    }
+
+    /// 진동 세부 설정을 모두 기본값으로 되돌립니다. ('진동 켜기' 스위치와 저장 칸은 그대로)
     func resetRumbleDetails() {
         for name in Self.rumbleProfileKeys { defaults.removeObject(forKey: key(name)) }
         notify()
