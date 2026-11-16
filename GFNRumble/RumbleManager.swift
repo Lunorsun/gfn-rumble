@@ -14,6 +14,10 @@ private final class Motor {
 
     /// 진단용: 마지막으로 난 오류 (상태 보기에 표시)
     static var lastError = "없음"
+    /// 진단용 카운터: 0이 아닌 세기 요청 / 진동 장치(엔진) 만든 횟수 / 실제 시작한 횟수
+    static var setCalls = 0
+    static var enginesMade = 0
+    static var playsStarted = 0
 
     init(controller: GCController, locality: GCHapticsLocality) {
         self.controller = controller
@@ -31,6 +35,7 @@ private final class Motor {
             }
             return
         }
+        Motor.setCalls += 1
 
         do {
             if engine == nil {
@@ -60,6 +65,7 @@ private final class Motor {
             if !isPlaying {
                 try player.start(atTime: CHHapticTimeImmediate)
                 isPlaying = true
+                Motor.playsStarted += 1
                 try player.sendParameters([control], atTime: CHHapticTimeImmediate)
             }
             // 날카로움은 기본에서 많이 벗어날 때만, 실패해도 무시합니다.
@@ -129,6 +135,7 @@ private final class Motor {
             Motor.lastError = "\(locality.rawValue): 엔진 시작 실패 \(error.localizedDescription)"
             return nil
         }
+        Motor.enginesMade += 1
         return engine
     }
 
@@ -251,6 +258,16 @@ final class RumbleManager {
     private(set) var peakWebCommand = 0.0
     var lastError: String { Motor.lastError }
 
+    // 진단용: 웹 명령이 진동까지 가는 단계별 횟수 (어디서 끊기는지 보려고)
+    private(set) var ignoredByAudioMode = 0     // 소리 햅틱 전용 설정 때문에 무시
+    private(set) var noControllerCount = 0      // 대상 컨트롤러를 못 찾음
+    private(set) var noRigCount = 0             // 컨트롤러가 진동을 지원하지 않음
+    private(set) var driveCount = 0             // 모터까지 전달됨
+    private(set) var lastTarget = "없음"        // 마지막으로 울린 컨트롤러 이름
+    var pipelineText: String {
+        "명령 \(webCommandCount) → 컨트롤러 못 찾음 \(noControllerCount) · 소리모드로 무시 \(ignoredByAudioMode) · 진동 미지원 \(noRigCount) → 모터 전달 \(driveCount) → 세기 요청 \(Motor.setCalls) · 장치 생성 \(Motor.enginesMade) · 시작 \(Motor.playsStarted)"
+    }
+
     private init() {
         let center = NotificationCenter.default
         center.addObserver(forName: .GCControllerDidConnect, object: nil, queue: .main) { [weak self] note in
@@ -283,8 +300,15 @@ final class RumbleManager {
         lastWebCommand = String(format: "강 %.2f / 약 %.2f / %.0fms", strong, weak, durationMs)
         // '게임 소리 → 햅틱'만 쓰도록 설정했으면 게임 진동은 무시합니다.
         let settings = AppSettings.shared
-        if settings.audioHapticsEnabled && !settings.audioHapticsWithRumble { return }
-        guard let controller = controller(webIndex: webIndex, id: id) else { return }
+        if settings.audioHapticsEnabled && !settings.audioHapticsWithRumble {
+            ignoredByAudioMode += 1
+            return
+        }
+        guard let controller = controller(webIndex: webIndex, id: id) else {
+            noControllerCount += 1
+            return
+        }
+        lastTarget = controller.vendorName ?? "이름 없음"
         drive(controller,
               strong: strong, weak: weak,
               leftTrigger: leftTrigger, rightTrigger: rightTrigger,
@@ -383,7 +407,11 @@ final class RumbleManager {
                        strong: Double, weak: Double,
                        leftTrigger: Double, rightTrigger: Double,
                        durationMs: Double, delayMs: Double) {
-        guard let rig = rig(for: controller) else { return }
+        guard let rig = rig(for: controller) else {
+            noRigCount += 1
+            return
+        }
+        driveCount += 1
         rig.cancelPending()
 
         let duration = min(max(durationMs, 0), 5000) / 1000

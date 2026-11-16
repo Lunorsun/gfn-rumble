@@ -295,6 +295,8 @@ final class WebViewController: UIViewController {
             "마지막 명령: \(manager.lastWebCommand)",
             "0이 아닌 명령: \(manager.nonZeroWebCommands)회 · 최대 세기 \(String(format: "%.2f", manager.peakWebCommand))",
             "마지막 진동 오류: \(manager.lastError)",
+            "단계별: \(manager.pipelineText)",
+            "마지막으로 울린 컨트롤러: \(manager.lastTarget)",
             "소리 햅틱: " + (AppSettings.shared.audioHapticsEnabled ? "켜짐" : "꺼짐") + " · 받은 값 \(AudioHaptics.shared.frameCount)회 · 마지막 \(AudioHaptics.shared.lastText)",
             "게임 진동도 같이: " + (AppSettings.shared.audioHapticsWithRumble ? "예" : "아니오"),
             "",
