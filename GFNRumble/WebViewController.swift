@@ -310,6 +310,9 @@ final class WebViewController: UIViewController {
             "컨트롤러",
             manager.controllerStatus(),
             "",
+            "자이로 센서",
+            GyroAim.statusText(),
+            "",
             "현재 주소: \(activeWebView.url?.host ?? "없음")"
         ]
         showInfo("상태", lines.joined(separator: "\n"))

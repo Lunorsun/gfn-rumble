@@ -112,13 +112,9 @@ final class SettingsViewController: UITableViewController {
                     footer: "끄면 게임 진동과 추가 햅틱이 모두 멈춰요. 아래 '진동 시험'은 꺼 둬도 울려요. 화면 왼쪽 아래 톱니바퀴 메뉴에서도 바로 켜고 끌 수 있어요.",
                     rows: powerRows),
 
-            Section(title: "진동 세기", footer: "전체 세기에 왼쪽·오른쪽·방아쇠 배율이 곱해져요. 상한은 아무리 세게 와도 넘지 않는 세기예요.", rows: [
+            Section(title: "진동 세기 (전체)", footer: "전체 설정은 왼쪽·오른쪽에 모두 적용되고, 아래 왼쪽/오른쪽 설정이 그 위에 더해져요. 상한은 아무리 세게 와도 넘지 않는 세기예요.", rows: [
                 .slider(title: "전체 세기", range: 0...1.5, format: Self.percent,
                         get: { s.rumbleGain }, set: { s.rumbleGain = $0 }),
-                .slider(title: "왼쪽 손잡이 (묵직)", range: 0...1.5, format: Self.percent,
-                        get: { s.leftMotorGain }, set: { s.leftMotorGain = $0 }),
-                .slider(title: "오른쪽 손잡이 (가벼움)", range: 0...1.5, format: Self.percent,
-                        get: { s.rightMotorGain }, set: { s.rightMotorGain = $0 }),
                 .slider(title: "방아쇠 진동 (L2·R2)", range: 0...1.5, format: Self.percent,
                         get: { s.triggerMotorGain }, set: { s.triggerMotorGain = $0 }),
                 .slider(title: "세기 상한", range: 0.2...1.0, format: Self.percent,
@@ -127,6 +123,30 @@ final class SettingsViewController: UITableViewController {
                         get: { s.rumbleDeadzone }, set: { s.rumbleDeadzone = $0 }),
                 .slider(title: "최소 세기", range: 0...0.3, format: Self.percent,
                         get: { s.rumbleMinimum }, set: { s.rumbleMinimum = $0 })
+            ]),
+
+            Section(title: "왼쪽 손잡이 (묵직한 진동)",
+                    footer: "곡선이 1보다 크면 약한 진동이 더 약해지고, 작으면 약한 진동도 또렷해져요.",
+                    rows: [
+                .slider(title: "세기", range: 0...1.5, format: Self.percent,
+                        get: { s.leftMotorGain }, set: { s.leftMotorGain = $0 }),
+                .slider(title: "상한", range: 0.2...1.0, format: Self.percent,
+                        get: { s.leftCeiling }, set: { s.leftCeiling = $0 }),
+                .slider(title: "반응 곡선", range: 0.5...2.0, format: Self.times,
+                        get: { s.leftCurve }, set: { s.leftCurve = $0 }),
+                .slider(title: "작은 진동 무시", range: 0...0.5, format: Self.percent,
+                        get: { s.leftDeadzone }, set: { s.leftDeadzone = $0 })
+            ]),
+
+            Section(title: "오른쪽 손잡이 (가벼운 진동)", footer: nil, rows: [
+                .slider(title: "세기", range: 0...1.5, format: Self.percent,
+                        get: { s.rightMotorGain }, set: { s.rightMotorGain = $0 }),
+                .slider(title: "상한", range: 0.2...1.0, format: Self.percent,
+                        get: { s.rightCeiling }, set: { s.rightCeiling = $0 }),
+                .slider(title: "반응 곡선", range: 0.5...2.0, format: Self.times,
+                        get: { s.rightCurve }, set: { s.rightCurve = $0 }),
+                .slider(title: "작은 진동 무시", range: 0...0.5, format: Self.percent,
+                        get: { s.rightDeadzone }, set: { s.rightDeadzone = $0 })
             ]),
 
             Section(title: "진동 느낌",
@@ -142,7 +162,11 @@ final class SettingsViewController: UITableViewController {
                         get: { s.rumbleFadeMs }, set: { s.rumbleFadeMs = $0 })
             ]),
 
-            Section(title: "좌우 설정", footer: "'합치기'는 한쪽에서만 오는 진동도 양쪽이 같이 울리게 해요.", rows: [
+            Section(title: "좌우 설정",
+                    footer: "좌우 차이: 0%는 양쪽이 같게, 100%는 원래대로, 200%는 센 쪽을 더 세게·약한 쪽을 더 약하게 해요. '합치기'는 한쪽에서만 오는 진동도 양쪽이 같이 울리게 해요.",
+                    rows: [
+                .slider(title: "좌우 차이", range: 0...2, format: Self.percent,
+                        get: { s.rumbleWidth }, set: { s.rumbleWidth = $0 }),
                 .segmented(title: "사용할 쪽", items: ["둘 다", "왼쪽만", "오른쪽만", "합치기"],
                            get: { s.rumbleSide }, set: { s.rumbleSide = $0 }),
                 .toggle(title: "왼쪽·오른쪽 바꾸기", get: { s.swapMotors }, set: { s.swapMotors = $0 }, confirmOn: nil)
@@ -211,12 +235,17 @@ final class SettingsViewController: UITableViewController {
                         .info("2048×1536과 2160×1620은 4:3이라 아이패드 화면에 꽉 차요. 실제로 받은 화질은 톱니바퀴 메뉴에서 볼 수 있어요.")
                     ]),
 
-            Section(title: "자이로 조준 (듀얼센스)",
-                    footer: "듀얼센스를 기울이거나 돌리면 오른쪽 스틱처럼 움직여요. Xbox·8BitDo는 자이로가 없어요. 방향이 반대면 반전·축을 바꿔 보세요.",
+            Section(title: "자이로 조준",
+                    footer: "기울이거나 돌리면 오른쪽 스틱처럼 움직여요. '컨트롤러'는 자이로가 있는 패드(듀얼센스·스위치 프로 등)에서, '아이패드'는 아이패드를 직접 기울여서 조준하고 어떤 패드와도 쓸 수 있어요(실험: 방향이 반대면 반전을 바꿔 보세요). 8BitDo처럼 아이패드가 자이로 값을 못 받는 패드는 아래 표시가 '없음'이에요. 터치패드는 듀얼센스만 돼요.",
                     rows: [
                         .toggle(title: "자이로 조준", get: { s.gyroEnabled }, set: { s.gyroEnabled = $0 }, confirmOn: nil),
-                        .segmented(title: "켜지는 때", items: ["항상", "L2 누를 때", "터치패드 누를 때"],
+                        .info("자이로 센서 확인\n" + GyroAim.statusText()),
+                        .segmented(title: "센서", items: ["컨트롤러", "아이패드"],
+                                   get: { s.gyroSource }, set: { s.gyroSource = $0 }),
+                        .segmented(title: "켜지는 때", items: ["항상", "L2", "터치패드", "L1"],
                                    get: { s.gyroActivation }, set: { s.gyroActivation = $0 }),
+                        .toggle(title: "가로 반전 (아이패드 센서)", get: { s.gyroPadInvertX },
+                                set: { s.gyroPadInvertX = $0 }, confirmOn: nil),
                         .slider(title: "가로 감도", range: 0.1...4.0, format: Self.times,
                                 get: { s.gyroSensitivityX }, set: { s.gyroSensitivityX = $0 }),
                         .slider(title: "세로 감도", range: 0.1...4.0, format: Self.times,
@@ -272,10 +301,10 @@ final class SettingsViewController: UITableViewController {
 
         // 듀얼센스 전용 설정은 듀얼센스가 연결됐을 때만 보여 줍니다.
         if !TriggerEffects.isDualSenseConnected {
-            let dualSenseOnly: Set<String> = ["방아쇠 효과·햅틱", "자이로 조준 (듀얼센스)", "게임 소리 → 햅틱 (실험)"]
+            let dualSenseOnly: Set<String> = ["방아쇠 효과·햅틱", "게임 소리 → 햅틱 (실험)"]
             sections = sections.filter { !dualSenseOnly.contains($0.title ?? "") }
             sections.insert(Section(title: "듀얼센스 전용", footer: nil, rows: [
-                .info("듀얼센스를 연결하면 방아쇠 효과·햅틱, 자이로 조준, 게임 소리 햅틱 설정이 나타나요.")
+                .info("듀얼센스를 연결하면 방아쇠 효과·햅틱, 게임 소리 햅틱 설정이 나타나요.")
             ]), at: min(2, sections.count))
         }
     }

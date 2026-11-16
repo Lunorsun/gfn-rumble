@@ -134,11 +134,51 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: key("swapMotors")); notify() }
     }
 
+    /// 좌우 차이 0.0 ~ 2.0 (기본 1.0). 0이면 양쪽이 같아지고, 2면 센 쪽은 더 세게·약한 쪽은 더 약하게.
+    var rumbleWidth: Double {
+        get { double("rumbleWidth", default: 1.0, range: 0.0...2.0) }
+        set { set(newValue, "rumbleWidth", range: 0.0...2.0) }
+    }
+
+    // 왼쪽·오른쪽 손잡이 따로. 전체 설정과 함께 적용됩니다:
+    // 작은 진동 무시는 둘 중 큰 값, 반응 곡선은 둘을 곱한 값, 세기 상한은 둘 중 작은 값을 씁니다.
+
+    var leftCeiling: Double {
+        get { double("leftCeiling", default: 1.0, range: 0.2...1.0) }
+        set { set(newValue, "leftCeiling", range: 0.2...1.0) }
+    }
+
+    var rightCeiling: Double {
+        get { double("rightCeiling", default: 1.0, range: 0.2...1.0) }
+        set { set(newValue, "rightCeiling", range: 0.2...1.0) }
+    }
+
+    var leftCurve: Double {
+        get { double("leftCurve", default: 1.0, range: 0.5...2.0) }
+        set { set(newValue, "leftCurve", range: 0.5...2.0) }
+    }
+
+    var rightCurve: Double {
+        get { double("rightCurve", default: 1.0, range: 0.5...2.0) }
+        set { set(newValue, "rightCurve", range: 0.5...2.0) }
+    }
+
+    var leftDeadzone: Double {
+        get { double("leftDeadzone", default: 0.0, range: 0.0...0.5) }
+        set { set(newValue, "leftDeadzone", range: 0.0...0.5) }
+    }
+
+    var rightDeadzone: Double {
+        get { double("rightDeadzone", default: 0.0, range: 0.0...0.5) }
+        set { set(newValue, "rightDeadzone", range: 0.0...0.5) }
+    }
+
     /// 저장 칸과 '기본값으로 되돌리기'가 다루는 진동 설정 이름들 (켜기/끄기 마스터는 제외)
     private static let rumbleProfileKeys = [
         "rumbleGain", "rumbleMinimum", "gameRumbleEnabled", "triggerHapticsEnabled",
         "leftMotorGain", "rightMotorGain", "triggerMotorGain", "rumbleCeiling", "rumbleDeadzone",
-        "rumbleCurve", "rumbleSharpness", "rumbleLengthScale", "rumbleFadeMs", "rumbleSide", "swapMotors"
+        "rumbleCurve", "rumbleSharpness", "rumbleLengthScale", "rumbleFadeMs", "rumbleSide", "swapMotors",
+        "rumbleWidth", "leftCeiling", "rightCeiling", "leftCurve", "rightCurve", "leftDeadzone", "rightDeadzone"
     ]
 
     /// 진동 세부 설정을 모두 기본값으로 되돌립니다. (켜기/끄기 스위치는 그대로)
@@ -309,10 +349,22 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: key("gyroEnabled")); notify() }
     }
 
-    /// 0 = 항상, 1 = L2 누를 때만, 2 = 터치패드 누를 때만
+    /// 0 = 항상, 1 = L2 누를 때만, 2 = 터치패드 누를 때만(듀얼센스), 3 = L1 누를 때만
     var gyroActivation: Int {
-        get { min(max(defaults.integer(forKey: key("gyroActivation")), 0), 2) }
-        set { defaults.set(min(max(newValue, 0), 2), forKey: key("gyroActivation")); notify() }
+        get { min(max(defaults.integer(forKey: key("gyroActivation")), 0), 3) }
+        set { defaults.set(min(max(newValue, 0), 3), forKey: key("gyroActivation")); notify() }
+    }
+
+    /// 자이로 센서: 0 = 컨트롤러(자이로가 있는 모든 패드), 1 = 아이패드 자체 자이로(아이패드를 기울여 조준)
+    var gyroSource: Int {
+        get { min(max(defaults.integer(forKey: key("gyroSource")), 0), 1) }
+        set { defaults.set(min(max(newValue, 0), 1), forKey: key("gyroSource")); notify() }
+    }
+
+    /// 아이패드 자이로로 조준할 때 가로 방향 반전
+    var gyroPadInvertX: Bool {
+        get { bool("gyroPadInvertX", default: false) }
+        set { defaults.set(newValue, forKey: key("gyroPadInvertX")); notify() }
     }
 
     var gyroSensitivityX: Double {

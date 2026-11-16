@@ -444,7 +444,8 @@ final class RumbleManager {
         guard value > 0.005 else { return 0 }
         let s = AppSettings.shared
         let side = left ? s.leftMotorGain : s.rightMotorGain
-        return Float(min(s.rumbleCeiling, max(0, value * s.rumbleGain * side)))
+        let top = min(s.rumbleCeiling, left ? s.leftCeiling : s.rightCeiling)
+        return Float(min(top, max(0, value * s.rumbleGain * side)))
     }
 
     func controllerStatus() -> String {
@@ -497,16 +498,29 @@ final class RumbleManager {
         default: break
         }
 
+        // 1-2) 좌우 차이: 평균에서 얼마나 벌릴지 (0 = 같게, 1 = 원래대로, 2 = 더 크게)
+        let width = settings.rumbleWidth
+        if abs(width - 1) > 0.001 {
+            let mean = (left + right) / 2
+            left = min(1, max(0, mean + (left - mean) * width))
+            right = min(1, max(0, mean + (right - mean) * width))
+        }
+
         // 2) 세기 가공: 작은 진동 무시 → 반응 곡선 → 세기 배율 → 최소 세기 → 상한
-        func shaped(_ value: Double, sideGain: Double) -> Float {
+        //    (왼쪽·오른쪽은 전체 설정과 각자 설정이 함께 적용돼요. 방아쇠는 전체 설정만.)
+        func shaped(_ value: Double, sideGain: Double,
+                    deadzone: Double = 0, curve: Double = 1, ceiling: Double = 1) -> Float {
             guard value > 0.005 else { return 0 }
             let gain = settings.rumbleGain * sideGain
-            guard gain > 0, value >= settings.rumbleDeadzone else { return 0 }
-            let curved = pow(min(1, value), settings.rumbleCurve)
-            return Float(min(settings.rumbleCeiling, max(0, max(settings.rumbleMinimum, curved * gain))))
+            guard gain > 0, value >= max(settings.rumbleDeadzone, deadzone) else { return 0 }
+            let curved = pow(min(1, value), settings.rumbleCurve * curve)
+            let top = min(settings.rumbleCeiling, ceiling)
+            return Float(min(top, max(0, max(settings.rumbleMinimum, curved * gain))))
         }
-        let s = shaped(left, sideGain: settings.leftMotorGain)
-        let w = shaped(right, sideGain: settings.rightMotorGain)
+        let s = shaped(left, sideGain: settings.leftMotorGain, deadzone: settings.leftDeadzone,
+                       curve: settings.leftCurve, ceiling: settings.leftCeiling)
+        let w = shaped(right, sideGain: settings.rightMotorGain, deadzone: settings.rightDeadzone,
+                       curve: settings.rightCurve, ceiling: settings.rightCeiling)
         let lt = shaped(leftTrigger, sideGain: settings.triggerMotorGain)
         let rt = shaped(rightTrigger, sideGain: settings.triggerMotorGain)
 
