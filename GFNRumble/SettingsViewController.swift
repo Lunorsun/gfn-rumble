@@ -51,27 +51,113 @@ final class SettingsViewController: UITableViewController {
     private static func percent(_ value: Double) -> String { "\(Int((value * 100).rounded()))%" }
     private static func times(_ value: Double) -> String { String(format: "%.1f×", value) }
 
+    private static func fade(_ value: Double) -> String { value < 5 ? "끔" : "\(Int(value.rounded()))ms" }
+
     private func buildSections() {
         let s = AppSettings.shared
+
+        // 켜기·끄기: 듀얼센스 전용 항목은 듀얼센스가 연결됐을 때만 보여 줍니다.
+        var powerRows: [Row] = [
+            .toggle(title: "진동 켜기", get: { s.rumbleEnabled }, set: { s.rumbleEnabled = $0 }, confirmOn: nil),
+            .toggle(title: "게임 진동", get: { s.gameRumbleEnabled }, set: { s.gameRumbleEnabled = $0 }, confirmOn: nil)
+        ]
+        if TriggerEffects.isDualSenseConnected {
+            powerRows += [
+                .toggle(title: "방아쇠 햅틱", get: { s.triggerHapticsEnabled }, set: { s.triggerHapticsEnabled = $0 }, confirmOn: nil),
+                .toggle(title: "게임 소리 → 햅틱 (실험)", get: { s.audioHapticsEnabled }, set: { s.audioHapticsEnabled = $0 }, confirmOn: nil)
+            ]
+        }
+
+        // 진동 시험 패턴 + 기본값으로 되돌리기
+        var testRows: [Row] = []
+        for pattern in TestPattern.allCases {
+            testRows.append(.action(title: pattern.title) { [weak self] in
+                if !RumbleManager.shared.runPattern(pattern) {
+                    self?.alert("진동 가능한 컨트롤러가 없어요", RumbleManager.shared.controllerStatus())
+                }
+            })
+        }
+        testRows.append(.action(title: "진동 세부 설정 기본값으로 되돌리기") { [weak self] in
+            s.resetRumbleDetails()
+            self?.buildSections()
+            self?.tableView.reloadData()
+        })
+
+        // 저장 칸 3개 (진동 세부 설정 + L2·R2)
+        let slotRows: [Row] = (0..<3).flatMap { slot -> [Row] in
+            [
+                .action(title: "저장 칸 \(slot + 1)에 지금 설정 저장" + (s.isTriggerSlotSaved(slot) ? " (덮어쓰기)" : "")) { [weak self] in
+                    s.saveTriggerSlot(slot)
+                    self?.buildSections()
+                    self?.tableView.reloadData()
+                    self?.alert("저장했어요", "저장 칸 \(slot + 1)에 진동 설정을 저장했어요.")
+                },
+                .action(title: "저장 칸 \(slot + 1) 불러오기" + (s.isTriggerSlotSaved(slot) ? "" : " (비어 있음)")) { [weak self] in
+                    if s.loadTriggerSlot(slot) {
+                        self?.buildSections()
+                        self?.tableView.reloadData()
+                    } else {
+                        self?.alert("비어 있어요", "먼저 저장 칸 \(slot + 1)에 설정을 저장해 주세요.")
+                    }
+                }
+            ]
+        }
+
         sections = [
             Section(title: "서명 만료",
                     footer: "만료 전에 LocalDevVPN을 켜고 SideStore → My Apps → Refresh All을 눌러 주세요. 만료 3일 전부터 매일 밤 9시에 알려 드려요.",
                     rows: [.info(ExpiryMonitor.shared.statusText())]),
 
-            Section(title: "진동", footer: nil, rows: [
-                .slider(title: "진동 세기", range: 0...1.5, format: Self.percent,
+            Section(title: "진동 켜기·끄기",
+                    footer: "끄면 게임 진동과 추가 햅틱이 모두 멈춰요. 아래 '진동 시험'은 꺼 둬도 울려요. 화면 왼쪽 아래 톱니바퀴 메뉴에서도 바로 켜고 끌 수 있어요.",
+                    rows: powerRows),
+
+            Section(title: "진동 세기", footer: "전체 세기에 왼쪽·오른쪽·방아쇠 배율이 곱해져요. 상한은 아무리 세게 와도 넘지 않는 세기예요.", rows: [
+                .slider(title: "전체 세기", range: 0...1.5, format: Self.percent,
                         get: { s.rumbleGain }, set: { s.rumbleGain = $0 }),
+                .slider(title: "왼쪽 손잡이 (묵직)", range: 0...1.5, format: Self.percent,
+                        get: { s.leftMotorGain }, set: { s.leftMotorGain = $0 }),
+                .slider(title: "오른쪽 손잡이 (가벼움)", range: 0...1.5, format: Self.percent,
+                        get: { s.rightMotorGain }, set: { s.rightMotorGain = $0 }),
+                .slider(title: "방아쇠 진동 (L2·R2)", range: 0...1.5, format: Self.percent,
+                        get: { s.triggerMotorGain }, set: { s.triggerMotorGain = $0 }),
+                .slider(title: "세기 상한", range: 0.2...1.0, format: Self.percent,
+                        get: { s.rumbleCeiling }, set: { s.rumbleCeiling = $0 }),
+                .slider(title: "작은 진동 무시", range: 0...0.5, format: Self.percent,
+                        get: { s.rumbleDeadzone }, set: { s.rumbleDeadzone = $0 }),
                 .slider(title: "최소 세기", range: 0...0.3, format: Self.percent,
-                        get: { s.rumbleMinimum }, set: { s.rumbleMinimum = $0 }),
-                .action(title: "진동 테스트") { [weak self] in
-                    if !RumbleManager.shared.runTest() {
-                        self?.alert("진동 가능한 컨트롤러가 없어요", RumbleManager.shared.controllerStatus())
-                    }
-                }
+                        get: { s.rumbleMinimum }, set: { s.rumbleMinimum = $0 })
             ]),
 
+            Section(title: "진동 느낌",
+                    footer: "반응 곡선: 1보다 크면 약한 진동이 더 약해지고(세게 울릴 때만 느껴짐), 작으면 약한 진동도 또렷해져요. 날카로움은 낮으면 묵직하고 높으면 또렷해요(컨트롤러에 따라 차이가 없을 수 있어요).",
+                    rows: [
+                .slider(title: "반응 곡선", range: 0.5...2.0, format: Self.times,
+                        get: { s.rumbleCurve }, set: { s.rumbleCurve = $0 }),
+                .slider(title: "날카로움", range: 0...1, format: Self.percent,
+                        get: { s.rumbleSharpness }, set: { s.rumbleSharpness = $0 }),
+                .slider(title: "진동 길이", range: 0.5...2.0, format: Self.times,
+                        get: { s.rumbleLengthScale }, set: { s.rumbleLengthScale = $0 }),
+                .slider(title: "끝 부드럽게 줄이기", range: 0...300, format: Self.fade,
+                        get: { s.rumbleFadeMs }, set: { s.rumbleFadeMs = $0 })
+            ]),
+
+            Section(title: "좌우 설정", footer: "'합치기'는 한쪽에서만 오는 진동도 양쪽이 같이 울리게 해요.", rows: [
+                .segmented(title: "사용할 쪽", items: ["둘 다", "왼쪽만", "오른쪽만", "합치기"],
+                           get: { s.rumbleSide }, set: { s.rumbleSide = $0 }),
+                .toggle(title: "왼쪽·오른쪽 바꾸기", get: { s.swapMotors }, set: { s.swapMotors = $0 }, confirmOn: nil)
+            ]),
+
+            Section(title: "진동 시험",
+                    footer: "지금 설정(세기·곡선·좌우 등)이 그대로 적용돼서 울려요. 마음에 안 들면 슬라이더를 움직이고 다시 눌러 보세요.",
+                    rows: testRows),
+
+            Section(title: "내 설정 저장 칸",
+                    footer: "진동 세부 설정과 (듀얼센스 연결 시) L2·R2 설정을 한 칸에 같이 저장해요. 게임마다 칸을 나눠 쓰세요. 진동 켜기·끄기 스위치는 저장되지 않아요.",
+                    rows: slotRows),
+
             Section(title: "방아쇠 효과·햅틱",
-                    footer: "게임과 상관없이 직접 정한 효과예요. 듀얼센스 전용이에요. 게임 진동과 섞여서 함께 느껴져요. 저장 칸에 게임별 설정을 넣어 두고 바꿔 끼세요.",
+                    footer: "게임과 상관없이 직접 정한 효과예요. 듀얼센스 전용이에요. 게임 진동과 섞여서 함께 느껴져요. 게임별 설정은 아래 '내 설정 저장 칸'에 저장하세요.",
                     rows: [
                         .action(title: "L2 상세 설정 — " + s.leftTrigger.mode.title) { [weak self] in
                             self?.navigationController?.pushViewController(TriggerDetailViewController(left: true), animated: true)
@@ -79,22 +165,7 @@ final class SettingsViewController: UITableViewController {
                         .action(title: "R2 상세 설정 — " + s.rightTrigger.mode.title) { [weak self] in
                             self?.navigationController?.pushViewController(TriggerDetailViewController(left: false), animated: true)
                         }
-                    ] + (0..<3).flatMap { slot -> [Row] in
-                        [
-                            .action(title: "저장 칸 \(slot + 1)에 지금 설정 저장") { [weak self] in
-                                s.saveTriggerSlot(slot)
-                                self?.alert("저장했어요", "저장 칸 \(slot + 1)에 L2·R2 설정을 저장했어요.")
-                            },
-                            .action(title: "저장 칸 \(slot + 1) 불러오기" + (s.isTriggerSlotSaved(slot) ? "" : " (비어 있음)")) { [weak self] in
-                                if s.loadTriggerSlot(slot) {
-                                    self?.buildSections()
-                                    self?.tableView.reloadData()
-                                } else {
-                                    self?.alert("비어 있어요", "먼저 저장 칸 \(slot + 1)에 설정을 저장해 주세요.")
-                                }
-                            }
-                        ]
-                    }),
+                    ]),
 
             Section(title: "화면", footer: "16:9 게임 화면을 4:3 아이패드에 어떻게 맞출지 골라요.", rows: [
                 .segmented(title: "화면 맞춤", items: VideoFit.allCases.map { $0.title },

@@ -157,6 +157,8 @@ private final class Rig {
 
     var pendingStart: DispatchWorkItem?
     var pendingStop: DispatchWorkItem?
+    /// '끝을 부드럽게' 줄이는 중간 단계들
+    var pendingSteps: [DispatchWorkItem] = []
 
     init?(controller: GCController) {
         guard let haptics = controller.haptics else { return nil }
@@ -212,9 +214,10 @@ private final class Rig {
 
     private func output() {
         let s = max(game.s, extra.s), w = max(game.w, extra.w)
-        // 추가 햅틱이 더 크면 그 날카로움을, 아니면 기본(0.5)을 씁니다.
-        let ss: Float = extra.s > game.s ? extraSharp.s : 0.5
-        let ws: Float = extra.w > game.w ? extraSharp.w : 0.5
+        // 추가 햅틱이 더 크면 그 날카로움을, 아니면 설정의 기본 날카로움(기본 0.5)을 씁니다.
+        let base = Float(AppSettings.shared.rumbleSharpness)
+        let ss: Float = extra.s > game.s ? extraSharp.s : base
+        let ws: Float = extra.w > game.w ? extraSharp.w : base
         strong?.set(s, sharpness: ss)
         weak?.set(w, sharpness: ws)
         combined?.set(max(s, w), sharpness: max(s, w) == s ? ss : ws)
@@ -227,6 +230,8 @@ private final class Rig {
         pendingStart = nil
         pendingStop?.cancel()
         pendingStop = nil
+        pendingSteps.forEach { $0.cancel() }
+        pendingSteps.removeAll()
     }
 
     func stop() {
@@ -241,6 +246,22 @@ private final class Rig {
         cancelPending()
         pendingExtraStop?.cancel()
         [strong, weak, combined, leftTrigger, rightTrigger].forEach { $0?.shutdown() }
+    }
+}
+
+/// 설정 화면의 진동 시험 패턴.
+enum TestPattern: Int, CaseIterable {
+    case soft, medium, strong, leftRight, heartbeat, triggers
+
+    var title: String {
+        switch self {
+        case .soft: return "약하게"
+        case .medium: return "중간"
+        case .strong: return "강하게"
+        case .leftRight: return "왼쪽 → 오른쪽"
+        case .heartbeat: return "심장박동"
+        case .triggers: return "방아쇠 (L2·R2)"
+        }
     }
 }
 
@@ -260,12 +281,13 @@ final class RumbleManager {
 
     // 진단용: 웹 명령이 진동까지 가는 단계별 횟수 (어디서 끊기는지 보려고)
     private(set) var ignoredByAudioMode = 0     // 소리 햅틱 전용 설정 때문에 무시
+    private(set) var ignoredByOff = 0           // 진동을 꺼 둬서 무시
     private(set) var noControllerCount = 0      // 대상 컨트롤러를 못 찾음
     private(set) var noRigCount = 0             // 컨트롤러가 진동을 지원하지 않음
     private(set) var driveCount = 0             // 모터까지 전달됨
     private(set) var lastTarget = "없음"        // 마지막으로 울린 컨트롤러 이름
     var pipelineText: String {
-        "명령 \(webCommandCount) → 컨트롤러 못 찾음 \(noControllerCount) · 소리모드로 무시 \(ignoredByAudioMode) · 진동 미지원 \(noRigCount) → 모터 전달 \(driveCount) → 세기 요청 \(Motor.setCalls) · 장치 생성 \(Motor.enginesMade) · 시작 \(Motor.playsStarted)"
+        "명령 \(webCommandCount) → 컨트롤러 못 찾음 \(noControllerCount) · 소리모드로 무시 \(ignoredByAudioMode) · 꺼서 무시 \(ignoredByOff) · 진동 미지원 \(noRigCount) → 모터 전달 \(driveCount) → 세기 요청 \(Motor.setCalls) · 장치 생성 \(Motor.enginesMade) · 시작 \(Motor.playsStarted)"
     }
 
     private init() {
@@ -282,6 +304,11 @@ final class RumbleManager {
         }
         center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             self?.stopAll()
+        }
+        // 설정에서 진동을 끄면 울리던 진동을 바로 멈춥니다.
+        center.addObserver(forName: AppSettings.didChange, object: nil, queue: .main) { [weak self] _ in
+            let s = AppSettings.shared
+            if !s.rumbleEnabled || !s.gameRumbleEnabled || !s.triggerHapticsEnabled { self?.stopAll() }
         }
         GCController.controllers().forEach(configure)
     }
@@ -300,6 +327,10 @@ final class RumbleManager {
         lastWebCommand = String(format: "강 %.2f / 약 %.2f / %.0fms", strong, weak, durationMs)
         // '게임 소리 → 햅틱'만 쓰도록 설정했으면 게임 진동은 무시합니다.
         let settings = AppSettings.shared
+        if !settings.rumbleEnabled || !settings.gameRumbleEnabled {
+            ignoredByOff += 1
+            return
+        }
         if settings.audioHapticsEnabled && !settings.audioHapticsWithRumble {
             ignoredByAudioMode += 1
             return
@@ -329,19 +360,47 @@ final class RumbleManager {
     /// 컨트롤러를 직접 울려봅니다: 왼쪽(묵직) → 오른쪽(가벼움).
     /// 진동 가능한 컨트롤러가 없으면 false.
     func runTest() -> Bool {
+        runPattern(.leftRight)
+    }
+
+    /// 시험용 진동 패턴. 설정(세기·곡선·좌우 등)이 그대로 적용돼서 지금 설정을 느껴볼 수 있어요.
+    /// 진동을 꺼 둬도 시험은 울립니다. 진동 가능한 컨트롤러가 없으면 false.
+    @discardableResult
+    func runPattern(_ pattern: TestPattern) -> Bool {
         guard let controller = controller(webIndex: 0, id: nil), rig(for: controller) != nil else {
             return false
         }
-        drive(controller, strong: 1, weak: 0, leftTrigger: 0, rightTrigger: 0, durationMs: 500, delayMs: 0)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self, weak controller] in
-            guard let self = self, let controller = controller else { return }
-            self.drive(controller, strong: 0, weak: 1, leftTrigger: 0, rightTrigger: 0, durationMs: 500, delayMs: 0)
+        func play(_ at: Double, _ leftLevel: Double, _ rightLevel: Double, ms: Double,
+                  lt: Double = 0, rt: Double = 0) {
+            let run: () -> Void = { [weak self, weak controller] in
+                guard let self = self, let controller = controller else { return }
+                self.drive(controller, strong: leftLevel, weak: rightLevel, leftTrigger: lt, rightTrigger: rt,
+                           durationMs: ms, delayMs: 0, force: true)
+            }
+            if at <= 0 { run() } else { DispatchQueue.main.asyncAfter(deadline: .now() + at, execute: run) }
+        }
+        switch pattern {
+        case .soft:      play(0, 0.25, 0.25, ms: 600)
+        case .medium:    play(0, 0.55, 0.55, ms: 600)
+        case .strong:    play(0, 1, 1, ms: 600)
+        case .leftRight:
+            play(0, 1, 0, ms: 500)
+            play(0.8, 0, 1, ms: 500)
+        case .heartbeat:
+            for beat in 0..<3 {
+                let t = Double(beat) * 0.9
+                play(t, 0.9, 0.5, ms: 110)
+                play(t + 0.2, 0.7, 0.35, ms: 110)
+            }
+        case .triggers:
+            play(0, 0, 0, ms: 500, lt: 1, rt: 1)
         }
         return true
     }
 
     /// 알림용 짧은 진동 (대기열 끝 등). 현재 컨트롤러를 울립니다.
     func pulse(strong: Double, weak: Double, durationMs: Double) {
+        guard AppSettings.shared.rumbleEnabled else { return }
         guard let controller = controller(webIndex: 0, id: nil) else { return }
         drive(controller, strong: strong, weak: weak, leftTrigger: 0, rightTrigger: 0,
               durationMs: durationMs, delayMs: 0)
@@ -350,11 +409,11 @@ final class RumbleManager {
     /// 방아쇠 햅틱용: 특정 컨트롤러 손잡이를 짧게 울립니다.
     /// 게임 진동을 끊지 않고 그 위에 더해집니다(더 큰 쪽이 느껴짐).
     func kick(_ controller: GCController, strong: Double, weak: Double, durationMs: Double) {
+        let settings = AppSettings.shared
+        guard settings.rumbleEnabled, settings.triggerHapticsEnabled else { return }
         guard let rig = rig(for: controller) else { return }
-        let gain = AppSettings.shared.rumbleGain
-        func scaled(_ v: Double) -> Float { v > 0.005 ? Float(min(1, v * gain)) : 0 }
         rig.pendingExtraStop?.cancel()
-        rig.applyExtra(strong: scaled(strong), weak: scaled(weak))
+        rig.applyExtra(strong: extraLevel(strong, left: true), weak: extraLevel(weak, left: false))
         let stop = DispatchWorkItem { [weak rig] in rig?.applyExtra(strong: 0, weak: 0) }
         rig.pendingExtraStop = stop
         DispatchQueue.main.asyncAfter(deadline: .now() + min(max(durationMs, 10), 1000) / 1000, execute: stop)
@@ -363,11 +422,10 @@ final class RumbleManager {
     /// 게임 소리 햅틱: 왼·오른쪽 세기와 날카로움. 다음 값이 오지 않으면 holdMs 뒤 멈춤.
     func audioFrame(_ controller: GCController, left: Double, right: Double,
                     sharpLeft: Double, sharpRight: Double, holdMs: Double) {
+        guard AppSettings.shared.rumbleEnabled else { return }
         guard let rig = rig(for: controller) else { return }
-        let gain = AppSettings.shared.rumbleGain
-        func scaled(_ v: Double) -> Float { v > 0.005 ? Float(min(1, v * gain)) : 0 }
         rig.pendingExtraStop?.cancel()
-        rig.applyExtra(strong: scaled(left), weak: scaled(right),
+        rig.applyExtra(strong: extraLevel(left, left: true), weak: extraLevel(right, left: false),
                        sharpStrong: Float(sharpLeft), sharpWeak: Float(sharpRight))
         let stop = DispatchWorkItem { [weak rig] in rig?.applyExtra(strong: 0, weak: 0) }
         rig.pendingExtraStop = stop
@@ -376,9 +434,17 @@ final class RumbleManager {
 
     /// 게임 소리 햅틱: 타격음 '탁'
     func audioTap(_ controller: GCController, left: Double, right: Double, sharpness: Double) {
+        guard AppSettings.shared.rumbleEnabled else { return }
         guard let rig = rig(for: controller) else { return }
-        let gain = AppSettings.shared.rumbleGain
-        rig.tap(left: Float(min(1, left * gain)), right: Float(min(1, right * gain)), sharpness: Float(sharpness))
+        rig.tap(left: extraLevel(left, left: true), right: extraLevel(right, left: false), sharpness: Float(sharpness))
+    }
+
+    /// 추가 햅틱(방아쇠·소리)에 전체 세기·좌우 세기·상한을 적용합니다.
+    private func extraLevel(_ value: Double, left: Bool) -> Float {
+        guard value > 0.005 else { return 0 }
+        let s = AppSettings.shared
+        let side = left ? s.leftMotorGain : s.rightMotorGain
+        return Float(min(s.rumbleCeiling, max(0, value * s.rumbleGain * side)))
     }
 
     func controllerStatus() -> String {
@@ -406,7 +472,10 @@ final class RumbleManager {
     private func drive(_ controller: GCController,
                        strong: Double, weak: Double,
                        leftTrigger: Double, rightTrigger: Double,
-                       durationMs: Double, delayMs: Double) {
+                       durationMs: Double, delayMs: Double, force: Bool = false) {
+        let settings = AppSettings.shared
+        // 진동을 꺼 뒀으면 울리지 않습니다. (시험 진동만 예외)
+        if !force && !settings.rumbleEnabled { return }
         guard let rig = rig(for: controller) else {
             noRigCount += 1
             return
@@ -414,18 +483,32 @@ final class RumbleManager {
         driveCount += 1
         rig.cancelPending()
 
-        let duration = min(max(durationMs, 0), 5000) / 1000
         let delay = min(max(delayMs, 0), 5000) / 1000
+        // 진동 길이 배율 (0.5 ~ 2배)
+        let duration = min(max(durationMs, 0) * settings.rumbleLengthScale, 8000) / 1000
 
-        // 설정의 진동 세기·최소 세기를 적용합니다.
-        let settings = AppSettings.shared
-        let gain = settings.rumbleGain
-        let minimum = settings.rumbleMinimum
-        func scaled(_ value: Double) -> Float {
-            guard value > 0.005, gain > 0 else { return 0 }
-            return Float(min(1, max(minimum, value * gain)))
+        // 1) 왼쪽·오른쪽 바꾸기 / 한쪽만 / 합치기
+        var left = strong, right = weak
+        if settings.swapMotors { swap(&left, &right) }
+        switch settings.rumbleSide {
+        case 1: right = 0
+        case 2: left = 0
+        case 3: let both = max(left, right); left = both; right = both
+        default: break
         }
-        let s = scaled(strong), w = scaled(weak), lt = scaled(leftTrigger), rt = scaled(rightTrigger)
+
+        // 2) 세기 가공: 작은 진동 무시 → 반응 곡선 → 세기 배율 → 최소 세기 → 상한
+        func shaped(_ value: Double, sideGain: Double) -> Float {
+            guard value > 0.005 else { return 0 }
+            let gain = settings.rumbleGain * sideGain
+            guard gain > 0, value >= settings.rumbleDeadzone else { return 0 }
+            let curved = pow(min(1, value), settings.rumbleCurve)
+            return Float(min(settings.rumbleCeiling, max(0, max(settings.rumbleMinimum, curved * gain))))
+        }
+        let s = shaped(left, sideGain: settings.leftMotorGain)
+        let w = shaped(right, sideGain: settings.rightMotorGain)
+        let lt = shaped(leftTrigger, sideGain: settings.triggerMotorGain)
+        let rt = shaped(rightTrigger, sideGain: settings.triggerMotorGain)
 
         let start = DispatchWorkItem { [weak rig] in
             rig?.apply(strong: s, weak: w, leftTrigger: lt, rightTrigger: rt)
@@ -437,11 +520,26 @@ final class RumbleManager {
             start.perform()
         }
 
+        // 3) 끝 부드럽게: 끝나는 시점부터 단계적으로 줄이고 마지막에 0
+        let fade = settings.rumbleFadeMs / 1000
+        let end = delay + duration
+        if fade > 0.005 {
+            let steps = 4
+            for k in 1...steps {
+                let factor = 1 - Float(k) / Float(steps + 1)
+                let item = DispatchWorkItem { [weak rig] in
+                    rig?.apply(strong: s * factor, weak: w * factor,
+                               leftTrigger: lt * factor, rightTrigger: rt * factor)
+                }
+                rig.pendingSteps.append(item)
+                DispatchQueue.main.asyncAfter(deadline: .now() + end + fade * Double(k - 1) / Double(steps), execute: item)
+            }
+        }
         let stop = DispatchWorkItem { [weak rig] in
             rig?.apply(strong: 0, weak: 0, leftTrigger: 0, rightTrigger: 0)
         }
         rig.pendingStop = stop
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay + duration, execute: stop)
+        DispatchQueue.main.asyncAfter(deadline: .now() + end + (fade > 0.005 ? fade : 0), execute: stop)
     }
 
     private func rig(for controller: GCController) -> Rig? {

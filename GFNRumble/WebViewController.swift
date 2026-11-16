@@ -216,11 +216,16 @@ final class WebViewController: UIViewController {
     // MARK: - 메뉴
 
     @objc private func showMenu() {
+        let rumbleOn = AppSettings.shared.rumbleEnabled
         let sheet = UIAlertController(title: "GFN Rumble",
-                                      message: "서명: " + ExpiryMonitor.shared.statusText()
+                                      message: "진동: " + (rumbleOn ? "켜짐" : "꺼짐")
+                                        + "\n서명: " + ExpiryMonitor.shared.statusText()
                                         + "\n받은 화질: " + (QualityAlerts.shared.lastSummary ?? "아직 없음 (게임 중에 확인)"),
                                       preferredStyle: .actionSheet)
 
+        sheet.addAction(UIAlertAction(title: rumbleOn ? "진동 끄기" : "진동 켜기", style: rumbleOn ? .destructive : .default) { _ in
+            AppSettings.shared.rumbleEnabled = !rumbleOn
+        })
         sheet.addAction(UIAlertAction(title: "설정", style: .default) { [weak self] _ in
             self?.openSettings()
         })
@@ -288,6 +293,8 @@ final class WebViewController: UIViewController {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
         let lines = [
             "앱 버전: build-\(build)",
+            "진동 스위치: " + (AppSettings.shared.rumbleEnabled ? "켜짐" : "꺼짐")
+                + " · 게임 진동 " + (AppSettings.shared.gameRumbleEnabled ? "켜짐" : "꺼짐"),
             "브리지 파일: " + (bridgeScriptLoaded ? "있음" : "없음 (빌드 문제)"),
             "브리지 실행: " + (bridgeReady ? (bridgeInstalled ? "정상" : "실행됐지만 설치 실패") : "아직 안 됨"),
             "지포스 나우가 진동 기능을 확인함: " + (pageCheckedRumble ? "예" : "아직 아니오"),

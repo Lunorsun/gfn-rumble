@@ -48,6 +48,105 @@ final class AppSettings {
         set { set(newValue, "rumbleMinimum", range: 0.0...0.3) }
     }
 
+    // MARK: - 진동 세부 조절
+
+    /// 진동 전체 켜기/끄기 (기본 켬). 끄면 게임 진동·방아쇠 햅틱·소리 햅틱이 모두 멈춥니다.
+    var rumbleEnabled: Bool {
+        get { bool("rumbleEnabled", default: true) }
+        set { defaults.set(newValue, forKey: key("rumbleEnabled")); notify() }
+    }
+
+    /// 게임이 보내는 진동 (기본 켬)
+    var gameRumbleEnabled: Bool {
+        get { bool("gameRumbleEnabled", default: true) }
+        set { defaults.set(newValue, forKey: key("gameRumbleEnabled")); notify() }
+    }
+
+    /// 방아쇠 햅틱 (기본 켬)
+    var triggerHapticsEnabled: Bool {
+        get { bool("triggerHapticsEnabled", default: true) }
+        set { defaults.set(newValue, forKey: key("triggerHapticsEnabled")); notify() }
+    }
+
+    /// 왼쪽(묵직) 손잡이 세기 배율 0.0 ~ 1.5
+    var leftMotorGain: Double {
+        get { double("leftMotorGain", default: 1.0, range: 0.0...1.5) }
+        set { set(newValue, "leftMotorGain", range: 0.0...1.5) }
+    }
+
+    /// 오른쪽(가벼움) 손잡이 세기 배율 0.0 ~ 1.5
+    var rightMotorGain: Double {
+        get { double("rightMotorGain", default: 1.0, range: 0.0...1.5) }
+        set { set(newValue, "rightMotorGain", range: 0.0...1.5) }
+    }
+
+    /// 방아쇠(L2·R2) 진동 세기 배율 0.0 ~ 1.5
+    var triggerMotorGain: Double {
+        get { double("triggerMotorGain", default: 1.0, range: 0.0...1.5) }
+        set { set(newValue, "triggerMotorGain", range: 0.0...1.5) }
+    }
+
+    /// 세기 상한 0.2 ~ 1.0 (기본 1.0). 아무리 세게 와도 이 세기를 넘지 않게 합니다.
+    var rumbleCeiling: Double {
+        get { double("rumbleCeiling", default: 1.0, range: 0.2...1.0) }
+        set { set(newValue, "rumbleCeiling", range: 0.2...1.0) }
+    }
+
+    /// 작은 진동 무시 0.0 ~ 0.5 (기본 0). 이보다 약한 진동은 울리지 않습니다.
+    var rumbleDeadzone: Double {
+        get { double("rumbleDeadzone", default: 0.0, range: 0.0...0.5) }
+        set { set(newValue, "rumbleDeadzone", range: 0.0...0.5) }
+    }
+
+    /// 반응 곡선 0.5 ~ 2.0 (기본 1.0). 1보다 크면 약한 진동이 더 약해지고, 작으면 더 강해집니다.
+    var rumbleCurve: Double {
+        get { double("rumbleCurve", default: 1.0, range: 0.5...2.0) }
+        set { set(newValue, "rumbleCurve", range: 0.5...2.0) }
+    }
+
+    /// 날카로움 0.0(묵직) ~ 1.0(또렷), 기본 0.5. 게임 진동에 적용됩니다.
+    var rumbleSharpness: Double {
+        get { double("rumbleSharpness", default: 0.5, range: 0.0...1.0) }
+        set { set(newValue, "rumbleSharpness", range: 0.0...1.0) }
+    }
+
+    /// 진동 길이 배율 0.5 ~ 2.0 (기본 1.0)
+    var rumbleLengthScale: Double {
+        get { double("rumbleLengthScale", default: 1.0, range: 0.5...2.0) }
+        set { set(newValue, "rumbleLengthScale", range: 0.5...2.0) }
+    }
+
+    /// 진동 끝을 부드럽게 줄이는 시간 0 ~ 300ms (기본 0 = 끔)
+    var rumbleFadeMs: Double {
+        get { double("rumbleFadeMs", default: 0.0, range: 0.0...300.0) }
+        set { set(newValue, "rumbleFadeMs", range: 0.0...300.0) }
+    }
+
+    /// 좌우 사용: 0 = 둘 다, 1 = 왼쪽만, 2 = 오른쪽만, 3 = 합쳐서(양쪽 같은 세기)
+    var rumbleSide: Int {
+        get { min(max(defaults.integer(forKey: key("rumbleSide")), 0), 3) }
+        set { defaults.set(min(max(newValue, 0), 3), forKey: key("rumbleSide")); notify() }
+    }
+
+    /// 왼쪽·오른쪽 진동 바꾸기
+    var swapMotors: Bool {
+        get { bool("swapMotors", default: false) }
+        set { defaults.set(newValue, forKey: key("swapMotors")); notify() }
+    }
+
+    /// 저장 칸과 '기본값으로 되돌리기'가 다루는 진동 설정 이름들 (켜기/끄기 마스터는 제외)
+    private static let rumbleProfileKeys = [
+        "rumbleGain", "rumbleMinimum", "gameRumbleEnabled", "triggerHapticsEnabled",
+        "leftMotorGain", "rightMotorGain", "triggerMotorGain", "rumbleCeiling", "rumbleDeadzone",
+        "rumbleCurve", "rumbleSharpness", "rumbleLengthScale", "rumbleFadeMs", "rumbleSide", "swapMotors"
+    ]
+
+    /// 진동 세부 설정을 모두 기본값으로 되돌립니다. (켜기/끄기 스위치는 그대로)
+    func resetRumbleDetails() {
+        for name in Self.rumbleProfileKeys { defaults.removeObject(forKey: key(name)) }
+        notify()
+    }
+
     // MARK: - 듀얼센스 방아쇠
 
     /// L2 / R2 방아쇠 설정 (JSON으로 이 아이패드에만 저장)
@@ -66,6 +165,12 @@ final class AppSettings {
         guard (0..<3).contains(slot) else { return }
         defaults.set(encode(leftTrigger), forKey: key("slot\(slot).left"))
         defaults.set(encode(rightTrigger), forKey: key("slot\(slot).right"))
+        // 진동 세부 설정도 같은 칸에 함께 저장합니다.
+        var snapshot: [String: Double] = [:]
+        for name in Self.rumbleProfileKeys {
+            if let number = defaults.object(forKey: key(name)) as? NSNumber { snapshot[name] = number.doubleValue }
+        }
+        defaults.set(snapshot, forKey: key("slot\(slot).rumble"))
         notify()
     }
 
@@ -77,6 +182,13 @@ final class AppSettings {
               let r = decode(defaults.data(forKey: key("slot\(slot).right"))) else { return false }
         defaults.set(encode(l), forKey: key("leftTrigger"))
         defaults.set(encode(r), forKey: key("rightTrigger"))
+        // 예전에 저장한 칸(진동 설정이 없는 칸)은 진동 설정을 건드리지 않습니다.
+        if let snapshot = defaults.dictionary(forKey: key("slot\(slot).rumble")) as? [String: Double] {
+            for name in Self.rumbleProfileKeys {
+                if let value = snapshot[name] { defaults.set(value, forKey: key(name)) }
+                else { defaults.removeObject(forKey: key(name)) }
+            }
+        }
         notify()
         return true
     }
