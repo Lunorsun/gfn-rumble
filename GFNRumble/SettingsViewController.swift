@@ -359,8 +359,8 @@ final class SettingsViewController: UITableViewController {
                 .action(title: "설정 복원 (파일 가져오기)") { [weak self] in
                     guard let self = self else { return }
                     SettingsBackup.shared.importFile(from: self) { [weak self] text in
+                        self?.reloadScreen()
                         self?.alert("설정 복원", text)
-                        self?.tableView.reloadData()
                     }
                 },
                 .toggle(title: "새 버전 알림 (하루 한 번 확인)", get: { UpdateCheck.shared.enabled },
@@ -632,7 +632,10 @@ final class SettingsViewController: UITableViewController {
                             set: { s.tvModeEnabled = $0 }, confirmOn: nil),
                     .info("TV를 연결하면 게임을 TV에 꽉 채워 보여 줘요(최대 1080p). AirPlay는 지연이 있어요."),
                     .toggle(title: "브라우저 표시: Chrome으로 보이기", get: { BrowserIdentity.chromeEnabled },
-                            set: { BrowserIdentity.chromeEnabled = $0 },
+                            set: { [weak screen] on in
+                                BrowserIdentity.chromeEnabled = on
+                                DispatchQueue.main.async { screen?.reloadScreen() }
+                            },
                             confirmOn: (title: "Chrome으로 보이기 (실험)",
                                         message: "지포스 나우가 진동을 보내는지 시험하는 기능이에요. 브라우저 이름표만 바꾸며, NVIDIA 약관상 '클라이언트 수정'으로 볼 수 있어요. 일부 기능이 오류 날 수 있어요. 앱을 완전히 껐다 켜야 적용돼요.")),
                     .info("지금: \(BrowserIdentity.currentName). 이상하면 끄고 앱을 다시 켜 주세요."),

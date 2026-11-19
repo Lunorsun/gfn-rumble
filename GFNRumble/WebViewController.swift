@@ -289,7 +289,7 @@ final class WebViewController: UIViewController {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
         let lines = [
             "앱 버전: build-\(build) · 새 버전 확인: \(UpdateCheck.shared.lastResult)",
-            "브라우저 표시: \(BrowserIdentity.currentName) · 막은 외부 메시지: \(MessageOrigin.rejectedCount)회",
+            "브라우저 표시: \(BrowserIdentity.currentName) · \(MessageOrigin.statusText)",
             "진동 스위치: " + (AppSettings.shared.rumbleEnabled ? "켜짐" : "꺼짐")
                 + " · 게임 진동 " + (AppSettings.shared.gameRumbleEnabled ? "켜짐" : "꺼짐"),
             "브리지 파일: " + (bridgeScriptLoaded ? "있음" : "없음 (빌드 문제)"),

@@ -71,7 +71,7 @@ final class ExpiryMonitor: NSObject {
         guard let expiry = expirationDate else { return nil }
         let remaining = expiry.timeIntervalSince(now)
         guard remaining > 0, remaining <= TimeInterval(Self.warnDays * 24 * 3600) else { return nil }
-        return "서명 만료까지 \(Self.remainingText(remaining)) 남았어요. SideStore에서 Refresh All을 누르거나, 안 되면 PC의 iloader로 다시 설치해 주세요."
+        return "서명 만료까지 \(Self.remainingText(remaining)) 남았어요. LocalDevVPN을 켜고 SideStore에서 Refresh All을 눌러 주세요. SideStore가 안 열리면 PC의 iloader로 다시 설치하면 돼요."
     }
 
     static func remainingText(_ seconds: TimeInterval) -> String {
@@ -124,9 +124,9 @@ final class ExpiryMonitor: NSObject {
     private static func notificationBody(expiry: Date, fireDate: Date) -> String {
         let remaining = expiry.timeIntervalSince(fireDate)
         if remaining <= 60 {
-            return "서명이 만료됐어요. PC를 켜고 아이패드를 USB로 연결한 뒤 iloader의 'IPA 가져오기'로 다시 설치해 주세요."
+            return "서명이 만료됐어요. SideStore가 열리면 LocalDevVPN을 켜고 Refresh All을, 안 열리면 PC의 iloader로 다시 설치해 주세요."
         }
-        return "서명 만료까지 \(remainingText(remaining)) 남았어요. SideStore → My Apps → Refresh All을 눌러 주세요. 오류가 나면 PC의 iloader 'IPA 가져오기'로 다시 설치하면 돼요. 이미 갱신했다면 GFN Rumble을 한 번 열어 주세요."
+        return "서명 만료까지 \(remainingText(remaining)) 남았어요. LocalDevVPN을 켜고 SideStore → My Apps → Refresh All을 눌러 주세요. SideStore가 안 열리면 PC의 iloader로 다시 설치하면 돼요. 이미 갱신했다면 GFN Rumble을 한 번 열어 주세요."
     }
 
     /// 알림 시각 목록 (시간순).

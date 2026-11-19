@@ -10,13 +10,26 @@ enum MessageOrigin {
 
     /// 진단용: 막은 메시지 수
     private(set) static var rejectedCount = 0
+    /// 진단용: 마지막으로 막은 주소 (주소 이름만, 경로·내용은 남기지 않음)
+    private(set) static var lastRejectedHost = ""
 
     static func isTrusted(_ message: WKScriptMessage) -> Bool {
         let origin = message.frameInfo.securityOrigin
         let host = origin.host.lowercased()
         let ok = origin.protocol == "https"
             && trustedDomains.contains { host == $0 || host.hasSuffix("." + $0) }
-        if !ok { rejectedCount += 1 }
+        if !ok {
+            rejectedCount += 1
+            let label = host.isEmpty ? (origin.protocol.isEmpty ? "빈 주소" : origin.protocol) : host
+            lastRejectedHost = String(label.prefix(60))
+        }
         return ok
+    }
+
+    /// 상태 보기용 문구. 로그인 팝업(구글·애플 등)에서도 올라가는 게 정상이에요.
+    static var statusText: String {
+        if rejectedCount == 0 { return "다른 사이트 요청 0회 무시" }
+        let whereText = lastRejectedHost.isEmpty ? "알 수 없음" : lastRejectedHost
+        return "다른 사이트 요청 \(rejectedCount)회 무시 (정상, 마지막: \(whereText))"
     }
 }

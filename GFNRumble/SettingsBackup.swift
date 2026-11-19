@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 ///
 /// 보안 벽:
 /// - 'settings.'로 시작하는 앱 설정 값만 내보내고 가져옵니다. 다른 값(만료 날짜, 계정, 기록)은 다루지 않습니다.
-/// - 가져올 때 크기(64KB 이하), 형식, 값 종류(숫자·참거짓·글자·데이터)를 확인하고 나머지는 버립니다.
+/// - 가져올 때 크기(64KB 이하), 형식, 값 종류(숫자·참거짓·글자·데이터·숫자 묶음)를 확인하고 나머지는 버립니다.
 /// - 인터넷을 쓰지 않습니다. 파일은 사용자가 고른 위치(파일 앱)에만 저장됩니다.
 final class SettingsBackup: NSObject, UIDocumentPickerDelegate {
 
@@ -83,10 +83,16 @@ final class SettingsBackup: NSObject, UIDocumentPickerDelegate {
 
     private static func isAllowedValue(_ value: Any) -> Bool {
         switch value {
-        case is NSNumber: return true
-        case let s as String: return s.count <= 4096
-        case let d as Data: return d.count <= 16 * 1024
-        default: return false
+        case let n as NSNumber:
+            return n.doubleValue.isFinite
+        case let s as String:
+            return s.count <= 4096
+        case let d as Data:
+            return d.count <= 16 * 1024
+        case let dict as [String: NSNumber]:
+            return dict.count <= 100 && dict.allSatisfy { $0.key.count <= 100 && $0.value.doubleValue.isFinite }
+        default:
+            return false
         }
     }
 }
